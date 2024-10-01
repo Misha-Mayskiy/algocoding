@@ -65,27 +65,27 @@ class Cinema:
         return plan
 
 
-# Пример использования
-cinema = Cinema("Cinemax")
-hall1 = Hall("Hall 1", 5, 10)
-cinema.add_hall(hall1)
-
-movie1 = Movie("Inception", 148)
-session1 = Session(movie1, hall1, "2024-10-01 19:00")
-hall1.add_session(session1)
-
-# Продаем билет
-ticket = session1.sell_ticket((1, 1))
-
-# Проверяем наличие свободных мест
-print(session1.is_seat_available((1, 1)))  # False
-print(session1.is_seat_available((1, 2)))  # True
-
-# Находим ближайший сеанс
-current_time = "2024-10-01 18:00"
-nearest_sessions = cinema.find_nearest_session(movie1, current_time)
-print(nearest_sessions)
-
-# Получаем план зала
-hall_plan = cinema.get_hall_plan(session1)
-print(hall_plan)
+# # Пример использования
+# cinema = Cinema("Cinemax")
+# hall1 = Hall("Hall 1", 5, 10)
+# cinema.add_hall(hall1)
+#
+# movie1 = Movie("Inception", 148)
+# session1 = Session(movie1, hall1, "2024-10-01 19:00")
+# hall1.add_session(session1)
+#
+# # Продаем билет
+# ticket = session1.sell_ticket((1, 1))
+#
+# # Проверяем наличие свободных мест
+# print(session1.is_seat_available((1, 1)))  # False
+# print(session1.is_seat_available((1, 2)))  # True
+#
+# # Находим ближайший сеанс
+# current_time = "2024-10-01 18:00"
+# nearest_sessions = cinema.find_nearest_session(movie1, current_time)
+# print(nearest_sessions)
+#
+# # Получаем план зала
+# hall_plan = cinema.get_hall_plan(session1)
+# print(hall_plan)
