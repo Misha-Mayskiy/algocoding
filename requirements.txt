@@ -34,3 +34,4 @@ networkx
 aiogram
 plotly
 matplotlib
+pyqt6
