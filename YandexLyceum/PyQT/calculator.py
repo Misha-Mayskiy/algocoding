@@ -1,185 +1,247 @@
 import sys
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QLabel, QPushButton, QGridLayout, QVBoxLayout
+)
 
 
 class Calculator(QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("Калькулятор")
+        self.setFixedSize(300, 400)
 
-        # Основные поля ввода
-        self.main_label = QLineEdit(self)
-        self.main_label.setReadOnly(True)
-        self.main_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.main_label.setFixedHeight(50)
-        self.main_label.setText('0')  # Инициализация с "0"
+        # Инициализация состояния калькулятора
+        self.reset_all()
 
-        self.secondary_label = QLineEdit(self)
-        self.secondary_label.setReadOnly(True)
+        # Создание интерфейса
+        self.create_ui()
+
+    def reset_all(self):
+        """Сброс всех операций и состояний калькулятора."""
+        self.current = "0"
+        self.previous = ""
+        self.operator = ""
+        self.reset_next = False
+        self.error = False
+
+    def create_ui(self):
+        """Создание и размещение всех компонентов калькулятора."""
+
+        # Создание вертикального основного лэйаута
+        main_layout = QVBoxLayout()
+        self.setLayout(main_layout)
+
+        # Дополнительное поле ввода (верхнее)
+        self.secondary_label = QLabel("")
         self.secondary_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.secondary_label.setFont(QFont("Arial", 12))
+        self.secondary_label.setStyleSheet("background-color: lightgray;")
         self.secondary_label.setFixedHeight(30)
+        main_layout.addWidget(self.secondary_label)
 
-        # Кнопки чисел
-        self.number_buttons = [QPushButton(str(i), self) for i in range(10)]
-        for button in self.number_buttons:
-            button.clicked.connect(self.number_clicked)
+        # Основное поле ввода (нижнее)
+        self.main_label = QLabel(self.current)
+        self.main_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.main_label.setFont(QFont("Arial", 24))
+        self.main_label.setStyleSheet("background-color: white;")
+        self.main_label.setFixedHeight(50)
+        main_layout.addWidget(self.main_label)
 
-        # Кнопки операций
-        self.clear_button = QPushButton('C', self)
-        self.clear_entry_button = QPushButton('CE', self)
-        self.divide_button = QPushButton('/', self)
-        self.multiply_button = QPushButton('*', self)
-        self.substract_button = QPushButton('-', self)
-        self.add_button = QPushButton('+', self)
-        self.float_point_button = QPushButton('.', self)
-        self.plus_minus_button = QPushButton('±', self)
-        self.equals_button = QPushButton('=', self)
+        # Создание сетки для кнопок
+        button_layout = QGridLayout()
+        main_layout.addLayout(button_layout)
 
-        # Подключение сигналов
-        self.clear_button.clicked.connect(self.clear)
+        # Определение кнопок
+        self.number_buttons = [QPushButton(str(i)) for i in range(10)]
+        self.clear_button = QPushButton("C")
+        self.clear_entry_button = QPushButton("CE")
+        self.divide_button = QPushButton("/")
+        self.multiply_button = QPushButton("*")
+        self.substract_button = QPushButton("-")
+        self.add_button = QPushButton("+")
+        self.float_point_button = QPushButton(".")
+        self.plus_minus_button = QPushButton("±")
+        self.equals_button = QPushButton("=")
+
+        # Настройка стиля кнопок
+        for button in self.number_buttons + [
+            self.clear_button, self.clear_entry_button,
+            self.divide_button, self.multiply_button,
+            self.substract_button, self.add_button,
+            self.float_point_button, self.plus_minus_button,
+            self.equals_button
+        ]:
+            button.setFixedSize(60, 40)
+            button.setFont(QFont("Arial", 14))
+
+        # Расположение кнопок на сетке
+        # Первая строка
+        button_layout.addWidget(self.clear_button, 0, 0)
+        button_layout.addWidget(self.clear_entry_button, 0, 1)
+        button_layout.addWidget(self.divide_button, 0, 2)
+        button_layout.addWidget(self.multiply_button, 0, 3)
+
+        # Вторая строка
+        button_layout.addWidget(self.number_buttons[7], 1, 0)
+        button_layout.addWidget(self.number_buttons[8], 1, 1)
+        button_layout.addWidget(self.number_buttons[9], 1, 2)
+        button_layout.addWidget(self.substract_button, 1, 3)
+
+        # Третья строка
+        button_layout.addWidget(self.number_buttons[4], 2, 0)
+        button_layout.addWidget(self.number_buttons[5], 2, 1)
+        button_layout.addWidget(self.number_buttons[6], 2, 2)
+        button_layout.addWidget(self.add_button, 2, 3)
+
+        # Четвертая строка
+        button_layout.addWidget(self.number_buttons[1], 3, 0)
+        button_layout.addWidget(self.number_buttons[2], 3, 1)
+        button_layout.addWidget(self.number_buttons[3], 3, 2)
+        button_layout.addWidget(self.equals_button, 3, 3, 2, 1)  # Рядом с равенством будут две строки
+
+        # Пятая строка
+        button_layout.addWidget(self.plus_minus_button, 4, 0)
+        button_layout.addWidget(self.number_buttons[0], 4, 1)
+        button_layout.addWidget(self.float_point_button, 4, 2)
+
+        # Подключение сигналов к слотам
+        for i, button in enumerate(self.number_buttons):
+            button.clicked.connect(lambda checked, x=i: self.input_number(x))
+        self.clear_button.clicked.connect(self.clear_all)
         self.clear_entry_button.clicked.connect(self.clear_entry)
-        self.divide_button.clicked.connect(lambda: self.operation('/'))
-        self.multiply_button.clicked.connect(lambda: self.operation('*'))
-        self.substract_button.clicked.connect(lambda: self.operation('-'))
-        self.add_button.clicked.connect(lambda: self.operation('+'))
-        self.float_point_button.clicked.connect(self.add_float_point)
+        self.divide_button.clicked.connect(lambda: self.set_operator("/"))
+        self.multiply_button.clicked.connect(lambda: self.set_operator("*"))
+        self.substract_button.clicked.connect(lambda: self.set_operator("-"))
+        self.add_button.clicked.connect(lambda: self.set_operator("+"))
+        self.float_point_button.clicked.connect(self.input_dot)
         self.plus_minus_button.clicked.connect(self.toggle_sign)
         self.equals_button.clicked.connect(self.calculate)
 
-        # Настройка компоновки
-        layout = QVBoxLayout()
-        layout.addWidget(self.secondary_label)
-        layout.addWidget(self.main_label)
-
-        button_layout = QVBoxLayout()
-
-        # Кнопки чисел
-        for i in range(3):
-            row_layout = QHBoxLayout()
-            for j in range(3):
-                row_layout.addWidget(self.number_buttons[i * 3 + j + 1])
-            button_layout.addLayout(row_layout)
-
-        # Последний ряд с 0, точкой и кнопкой смены знака
-        last_row_layout = QHBoxLayout()
-        last_row_layout.addWidget(self.number_buttons[0])
-        last_row_layout.addWidget(self.float_point_button)
-        last_row_layout.addWidget(self.plus_minus_button)
-        button_layout.addLayout(last_row_layout)
-
-        # Кнопки операций
-        operations_layout = QVBoxLayout()
-        operations_layout.addWidget(self.clear_button)
-        operations_layout.addWidget(self.clear_entry_button)
-        operations_layout.addWidget(self.divide_button)
-        operations_layout.addWidget(self.multiply_button)
-        operations_layout.addWidget(self.substract_button)
-        operations_layout.addWidget(self.add_button)
-        operations_layout.addWidget(self.equals_button)
-
-        main_layout = QHBoxLayout()
-        main_layout.addLayout(button_layout)
-        main_layout.addLayout(operations_layout)
-
-        layout.addLayout(main_layout)
-        self.setLayout(layout)
-
-        self.setWindowTitle('Калькулятор')
-        self.setFixedSize(300, 400)
-
-        # Переменные для хранения состояния
-        self.first_operand = None
-        self.second_operand = None
-        self.current_operation = None
-        self.clear_secondary_label()
-
-    def number_clicked(self):
-        button = self.sender()
-        number = button.text()
-        if self.main_label.text() in ['0', 'ОШИБКА']:
-            self.main_label.setText(number)
+    def input_number(self, num):
+        """Обработка ввода цифры."""
+        if self.error:
+            self.reset_all()
+        if self.reset_next:
+            self.current = ""
+            self.reset_next = False
+        if self.current == "0":
+            self.current = str(num)
         else:
-            self.main_label.setText(self.main_label.text() + number)
+            self.current += str(num)
+        self.update_display()
 
-    def operation(self, operator):
-        if self.current_operation:
-            self.calculate()
-        self.first_operand = self.get_number(self.main_label.text())
-        self.current_operation = operator
-        self.secondary_label.setText(f"{self.first_operand} {operator} ")
-
-        self.main_label.setText('0')
-
-    def calculate(self):
-        if self.current_operation is None:
-            return
-
-        self.second_operand = self.get_number(self.main_label.text())
-        try:
-            if self.current_operation == '+':
-                result = self.first_operand + self.second_operand
-            elif self.current_operation == '-':
-                result = self.first_operand - self.second_operand
-            elif self.current_operation == '*':
-                result = self.first_operand * self.second_operand
-            elif self.current_operation == '/':
-                if self.second_operand == 0:
-                    raise ZeroDivisionError
-                result = self.first_operand / self.second_operand
-        except ZeroDivisionError:
-            self.main_label.setText('ОШИБКА')
-            self.clear_secondary_label()
-            return
-
-        self.main_label.setText(self.format_result(result))
-        self.clear_secondary_label()
-        self.current_operation = None
-
-    def clear(self):
-        self.main_label.setText('0')
-        self.clear_secondary_label()
-        self.first_operand = None
-        self.second_operand = None
-        self.current_operation = None
-
-    def clear_entry(self):
-        # Очищаем только главное поле
-        self.main_label.setText('0')  # Только очищаем main_label, не трогаем secondary_label
-
-    def add_float_point(self):
-        if '.' not in self.main_label.text():
-            self.main_label.setText(self.main_label.text() + '.')
+    def input_dot(self):
+        """Обработка ввода точки."""
+        pass
 
     def toggle_sign(self):
-        current_value = self.main_label.text()
-        # Преобразуем строку в число, чтобы точно определить, является ли оно нулем
-        if current_value == "ОШИБКА":
-            return
-        numeric_value = float(current_value)
-        if numeric_value == 0:
-            return
-        self.main_label.setText(str(-numeric_value))
+        """Смена знака текущего числа."""
+        pass
 
-    def get_number(self, text):
+    def set_operator(self, op):
+        """Установка арифметического оператора."""
+        if self.error:
+            return
+        if self.operator and not self.reset_next:
+            self.calculate()
+        self.previous = self.current
+        self.operator = op
+        self.secondary_label.setText(f"{self.format_number(self.previous)} {self.operator}")
+        self.reset_next = True
+
+    def calculate(self):
+        """Выполнение арифметической операции."""
+        if not self.operator:
+            return
         try:
-            return float(text)
-        except ValueError:
-            return 0.0
+            num1 = float(self.previous)
+            num2 = float(self.current)
+            result = 0
+            if self.operator == "+":
+                result = num1 + num2
+            elif self.operator == "-":
+                result = num1 - num2
+            elif self.operator == "*":
+                result = num1 * num2
+            elif self.operator == "/":
+                if num2 == 0:
+                    raise ZeroDivisionError
+                result = num1 / num2
 
-    def format_result(self, result):
-        if result % 1 == 0:
-            return "{:.0f}".format(result)  # Выводим целые числа без знаков после запятой
-        elif abs(result) >= 1e12:  # Если число большое, используем научную нотацию
-            return "{:.2e}".format(result)
-        return "{:.10g}".format(result)
+            # Удаление .0 если число целое
+            if result == int(result):
+                result = int(result)
+                self.current = str(result)
+            else:
+                self.current = str(result)
 
-    def clear_secondary_label(self):
-        self.secondary_label.setText('')
+            self.secondary_label.setText(
+                f"{self.format_number(self.previous)} {self.operator} {self.format_number(self.current)}")
+            self.main_label.setText(self.format_number(self.current, main=True))
+            self.operator = ""
+            self.reset_next = True
+        except ZeroDivisionError:
+            self.main_label.setText("ОШИБКА")
+            self.secondary_label.setText("")
+            self.error = True
+        except Exception:
+            self.main_label.setText("ОШИБКА")
+            self.secondary_label.setText("")
+            self.error = True
+
+    def clear_all(self):
+        """Очистка всех вводов и состояний."""
+        self.reset_all()
+        self.secondary_label.setText("")
+        self.update_display()
+
+    def clear_entry(self):
+        """Очистка текущего ввода."""
+        if self.error:
+            self.clear_all()
+            return
+        self.current = "0"
+        self.update_display()
+
+    def update_display(self):
+        """Обновление отображения на экране калькулятора."""
+        formatted = self.format_number(self.current, main=True)
+        self.main_label.setText(formatted)
+        if self.operator:
+            self.secondary_label.setText(f"{self.format_number(self.previous)} {self.operator}")
+        else:
+            self.secondary_label.setText("")
+
+    def format_number(self, num_str, main=False):
+        """
+        Форматирование числа с учетом ограничений по длине.
+        :param num_str: Число в виде строки.
+        :param main: Флаг для основного поля (ограничение 11 символов).
+        :return: Отформатированная строка.
+        """
+        try:
+            num = float(num_str)
+            # Удаление .0 если число целое
+            if num == int(num):
+                num = int(num)
+            if main:
+                display = str(num)
+                if len(display) > 11:
+                    display = f"{num:.2e}"
+            else:
+                display = str(num)
+                if len(str(num).replace('-', '').replace('.', '')) > 30:
+                    display = f"{num:.2e}"
+            return display
+        except Exception:
+            return "ОШИБКА"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = Calculator()
-    window.show()
+    calculator = Calculator()
+    calculator.show()
     sys.exit(app.exec())
