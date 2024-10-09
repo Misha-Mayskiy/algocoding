@@ -52,3 +52,19 @@
 # print(max(numbers), min(numbers), sum(numbers))
 
 # print(tuple(sorted(eval(input()), key=lambda x: x[2])))
+
+# Ввод кортежа в виде строки от пользователя
+input_str = input("Введите вложенный кортеж: ")
+
+# Убираем лишние символы и преобразуем строку в список кортежей
+input_str = input_str.replace("(", "").replace(")", "")
+nested_tuple = tuple(
+    tuple(map(int, item.split(", "))) for item in input_str.split("), (")
+)
+
+# Сортировка по третьему элементу каждого под-кортежа
+sorted_tuple = tuple(sorted(nested_tuple, key=lambda x: x[2]))
+
+# Вывод отсортированного кортежа
+print(sorted_tuple)
+
