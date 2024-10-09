@@ -43,3 +43,12 @@
 # for k in range(1, n + 1):
 #     row.append(row[-1] * (n - k + 1) // k)
 # print(row)
+
+# numbers = list(map(int, input().split()))
+# print(len(tuple(num for num in numbers if num > 0)),
+#       len(tuple(num for num in numbers if num < 0)))
+
+# numbers = tuple(map(float, input().split()))
+# print(max(numbers), min(numbers), sum(numbers))
+
+# print(tuple(sorted(eval(input()), key=lambda x: x[2])))
