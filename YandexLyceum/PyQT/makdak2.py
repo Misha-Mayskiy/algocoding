@@ -75,7 +75,7 @@ class MyWidget(QWidget):
 
         for checkbox, spinbox in zip(self.checkboxes, self.inputs):
             if checkbox.isChecked():
-                item_name = checkbox.text()
+                item_name = checkbox.textinput()
                 quantity = spinbox.value()
                 item_price = self.prices[item_name] * quantity
                 total_price += item_price

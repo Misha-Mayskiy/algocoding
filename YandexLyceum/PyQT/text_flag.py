@@ -74,7 +74,7 @@ class FlagMaker(QWidget):
         """Возвращает текст выбранной радио-кнопки из группы"""
         selected_button = button_group.checkedButton()
         if selected_button:
-            return selected_button.text()
+            return selected_button.textinput()
         return None
 
 

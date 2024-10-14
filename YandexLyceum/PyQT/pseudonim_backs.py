@@ -99,13 +99,13 @@ class Pseudonym(QMainWindow):
         self.takeButton.clicked.connect(self.take)
 
     def start(self):
-        self.kamney = int(self.stones.text())
+        self.kamney = int(self.stones.textinput())
         self.remainLcd.display(self.kamney)
         self.listWidget.clear()
         self.resultLabel.setText('')
 
     def take(self):
-        self.take_chel = int(self.takeInput.text())
+        self.take_chel = int(self.takeInput.textinput())
         if self.kamney - self.take_chel == 0:
             self.listWidget.addItem(f'Игрок взял - {self.take_chel}')
             self.remainLcd.display(self.kamney - self.take_chel)

@@ -137,20 +137,20 @@ def generate_movie_brochure(cinema, new_movies):
     for movie in new_movies:
         slide = prs.slides.add_slide(prs.slide_layouts[1])
         title = slide.shapes.title
-        title.text = f"Рекламный буклет: {movie.title}"
+        title.textinput = f"Рекламный буклет: {movie.title}"
 
         subtitle = slide.shapes.placeholders[1]
-        subtitle.text = f"Продолжительность: {movie.duration} мин"
+        subtitle.textinput = f"Продолжительность: {movie.duration} мин"
 
         slide_content = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(5), Inches(2))
         content = slide_content.text_frame
-        content.text = "Сеансы в кинотеатрах:"
+        content.textinput = "Сеансы в кинотеатрах:"
 
         for hall in cinema.halls:
             for session in hall.sessions:
                 if session.movie == movie:
                     p = content.add_paragraph()
-                    p.text = f"{hall.name}: {session.start_time}"
+                    p.textinput = f"{hall.name}: {session.start_time}"
 
     prs.save(f"Movie_Brochure_{datetime.now().strftime('%Y_%m_%d')}.pptx")
 
