@@ -1,4 +1,3 @@
-import os
 import statistics
 import sys
 
@@ -6,19 +5,18 @@ import sys
 file_names = sys.stdin.read().strip().split()
 
 all_numbers = []
-file_contents = {}
+result_lines = []
 
 # Чтение чисел из файлов
 for file_name in sorted(file_names):
     try:
         with open(file_name, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-            numbers = []
             for line in lines:
                 numbers_in_line = list(map(int, line.strip().split()))
-                numbers.extend(numbers_in_line)
-            file_contents[file_name] = numbers
-            all_numbers.extend(numbers)
+                result_lines.append(numbers_in_line)  # Сохраняем каждую строку
+                all_numbers.extend(numbers_in_line)  # Собираем все числа для медианы
+
     except FileNotFoundError:
         print(f"Файл {file_name} не найден. Пропуск...")
     except Exception as e:
@@ -27,16 +25,8 @@ for file_name in sorted(file_names):
 # Вычисление медианы
 median = statistics.median(all_numbers) if all_numbers else None
 
-# Фильтрация чисел по медиане
-result_lines = []
-if median is not None:
-    for numbers in file_contents.values():
-        filtered_numbers = [str(num) for num in numbers if num < median]
-        result_lines.append(' '.join(filtered_numbers))
-else:
-    result_lines = [''] * len(file_contents)
-
-# Запись результата в файл
+# Фильтрация чисел по медиане и запись результата
 with open('face.txt', 'w', encoding='utf-8') as output_file:
-    for line in result_lines:
-        output_file.write(line + '\n')
+    for numbers in result_lines:
+        filtered_numbers = [str(num) for num in numbers if num < median]
+        output_file.write(' '.join(filtered_numbers) + '\n')
