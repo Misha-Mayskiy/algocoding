@@ -55,19 +55,19 @@
 #
 # censor_forbidden_words(input())
 
-# def count_fruits(file_name):
-#     with open(file_name, 'r', encoding='utf-8') as f:
-#         words = f.read().lower().split()
-#
-#     fruit_counts = {}
-#     for word in words:
-#         fruit_counts[word] = fruit_counts.get(word, 0) + 1
-#
-#     print("Названия этих фруктов встречаются в тексте:")
-#     for fruit, count in fruit_counts.items():
-#         print(f'"{fruit}" - {count} раз(а)')
-#
-# count_fruits('fruits.txt')
+def count_fruits(file_name):
+    with open(file_name, 'r') as f:
+        words = f.read().lower().split()
+
+    fruit_counts = {}
+    for word in words:
+        fruit_counts[word] = fruit_counts.get(word, 0) + 1
+
+    print("Названия этих фруктов встречаются в тексте:")
+    for fruit, count in fruit_counts.items():
+        print(f'"{fruit}" - {count} раз(а)')
+
+count_fruits('fruits.txt')
 
 # def check_grades(file_name):
 #     with open(file_name, 'r', encoding='utf-8') as f:
