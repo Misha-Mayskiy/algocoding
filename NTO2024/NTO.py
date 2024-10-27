@@ -1,42 +1,38 @@
-def count_divisors(num):
-    count = 0
-    for i in range(1, num // 2 + 1):
-        if num % i == 0:
-            count += 1
-            if i != num // i:  # Если делитель не равен квадрату числа
-                count += 1
-    return count
+def solve(n, a):
+    # Сортировка длин полосок в порядке убывания
+    a.sort(reverse=True)
 
-def check_conditions(n):
-    if n % 2 != 0:
-        return False  # n должно быть четным
+    # Итерация по отсортированному массиву и разделение полосок на две части
+    horizontal = []
+    vertical = []
+    for i in range(n):
+        if i % 2 == 0:
+            horizontal.append(a[i])
+        else:
+            vertical.append(a[i])
 
-    d_o = 0  # Количество нечетных делителей
-    d_e = 0  # Количество четных делителей
-    for i in range(1, n + 1):
-        if n % i == 0:
-            if i % 2 == 0:
-                d_e += 1
-            else:
-                d_o += 1
+    # Вычисление максимальной длины и ширины для каждой части
+    max_width = min(len(horizontal), len(vertical))
 
-    if d_e != 5 * d_o:
-        return False
+    # Учет разной длины полосок
+    max_area = 0
+    for i in range(1, max_width + 1):
+        for j in range(i, max_width + 1):
+            total_length = 0
+            min_length = float('inf')
+            for k in range(i):
+                total_length += min(horizontal[k], vertical[k])
+                min_length = min(min_length, min(horizontal[k], vertical[k]))
+            max_length = min(total_length // i, min_length)
+            area = max_length * i
+            max_area = max(max_area, area)
 
-    d_total = d_e + d_o
-    if d_total % 3 != 0 or d_o == 0:
-        return False
+    return max_area
 
-    # Проверяем, что половина четных делителей делится на 5
-    if d_e % 2 != 0 or (d_e // 2) % 2 != 0:
-        return False
 
-    return True
+# Ввод данных
+n = int(input())
+a = list(map(int, input().split()))
 
-max_number = 0
-
-for n in range(1, 10001):
-    if check_conditions(n):
-        max_number = n
-
-print(max_number)
+# Вызов функции и вывод результата
+print(solve(n, a))
