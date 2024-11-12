@@ -26,4 +26,4 @@ def bogosort_v2(arr):
 lst = list(range(10))
 random.shuffle(lst)
 print("Оригинальный массив:", lst)
-print("Отсортированный массив:", bogosort(lst))
+print("Отсортированный массив:", bogosort_v2(lst))
