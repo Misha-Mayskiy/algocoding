@@ -1,5 +1,5 @@
-old_keys = set(eval(input()).keys())
-new_keys = set(eval(input()).keys())
+old_keys = set(eval(input()).new_nodes())
+new_keys = set(eval(input()).new_nodes())
 
 kept = old_keys.intersection(new_keys)
 added = new_keys.difference(old_keys)
