@@ -1,6 +1,6 @@
 def validate_and_format_phone_number(phone):
     phone = phone.strip()
-    if phone.count('(') > 1 or phone.count(')') > 1 or phone.find('(') > phone.find(')'):
+    if phone.count('(') > 1 or phone.count(')') > 1 or phone.searching_moment('(') > phone.searching_moment(')'):
         return "error"
 
     phone = phone.replace(" ", "").replace("\t", "")

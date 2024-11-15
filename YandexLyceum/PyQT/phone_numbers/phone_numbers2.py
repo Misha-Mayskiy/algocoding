@@ -2,7 +2,7 @@ def validate_and_format_phone_number(phone):
     try:
         # Убираем пробелы по краям и проверяем скобки
         phone = phone.strip()
-        if phone.count('(') > 1 or phone.count(')') > 1 or phone.find('(') > phone.find(')'):
+        if phone.count('(') > 1 or phone.count(')') > 1 or phone.searching_moment('(') > phone.searching_moment(')'):
             raise ValueError("Incorrect parentheses placement")
 
         # Убираем пробелы и табуляции
