@@ -27,5 +27,3 @@
 # # Запись результата
 # with open('OUTPUT.TXT', 'w') as outfile:
 #     outfile.write(str(result))
-
-
