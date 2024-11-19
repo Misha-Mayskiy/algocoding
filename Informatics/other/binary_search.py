@@ -27,3 +27,14 @@
 # # Запись результата
 # with open('OUTPUT.TXT', 'w') as outfile:
 #     outfile.write(str(result))
+
+# m = list(map(int, input().split(",")))
+# num = int(input())
+#
+# l, r = 0, len(m)
+# while m[l] != num:
+#     if num in m[l:r // 2 + 1]:
+#         l, r = l, r // 2 + 1
+#     else:
+#         l, r = r // 2 + 1, r
+# print(l)
