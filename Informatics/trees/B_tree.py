@@ -33,13 +33,13 @@ class BTreeNode:
 
     # Разбиение дочернего узла при переполнении
     def split_child(self, i, y):
-        z = BTreeNode(y.t, y.leaf)
+        z = BTreeNode(y.text, y.leaf)
         z.keys = y.keys[self.t:(2 * self.t - 1)]
         y.keys = y.keys[0:(self.t - 1)]
 
         if not y.leaf:
-            z.children = y.children[self.t:(2 * self.t)]
-            y.children = y.children[0:self.t]
+            z.children = y.child[self.t:(2 * self.t)]
+            y.child = y.child[0:self.t]
 
         self.children.insert(i + 1, z)
         self.keys.insert(i, y.keys[self.t - 1])

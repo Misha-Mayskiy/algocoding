@@ -17,10 +17,10 @@ class BT:
 
     def _a(self, c, k):
         if k < c.k:
-            if c.l:
-                self._a(c.l, k)
+            if c.lenword:
+                self._a(c.lenword, k)
             else:
-                c.l = N(k)
+                c.lenword = N(k)
         else:
             if c.r:
                 self._a(c.r, k)
@@ -39,7 +39,7 @@ class BT:
             str = "" + c.k
             if l in str:
                 m.append(str)
-            self._f(c.l, t, m)
+            self._f(c.lenword, t, m)
             self._f(c.r, t, m)
         except Exception:
             pass
