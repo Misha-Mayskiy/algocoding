@@ -1,0 +1,28 @@
+mario.bmp 1
+----------
+Summary: 0 B
+
+boy.bmp 2000
+----------
+Summary: 0 B
+
+output.txt 1
+----------
+Summary: 0 B
+
+input.txt 3000
+----------
+Summary: 0 B
+
+temp.txt 4
+----------
+Summary: 0 B
+
+scratch.zip 5
+----------
+Summary: 0 B
+
+data.zip 900
+----------
+Summary: 0 B
+
