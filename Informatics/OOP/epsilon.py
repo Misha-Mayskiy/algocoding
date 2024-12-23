@@ -1,24 +1,26 @@
-def is_symmetric(sequence, epsilon):
-    n = len(sequence)
-    for i in range(n // 2):
-        if abs(sequence[i] - sequence[n - i - 1]) > epsilon:
-            return False
-    return True
+def max_symmetry_find(m, tolerance):
+    len_arr = len(m)
+    max_seq_len = 0
+    st_pos = 0
 
-def find_longest_symmetric_sequence(sequence, epsilon):
-    n = len(sequence)
-    max_length = 0
-    best_sequence = []
-    for i in range(n):
-        for j in range(i + 1, n + 1):
-            sub_sequence = sequence[i:j]
-            if is_symmetric(sub_sequence, epsilon):
-                if len(sub_sequence) > max_length:
-                    max_length = len(sub_sequence)
-                    best_sequence = sub_sequence
-    return best_sequence
+    def symmetry_check(li, ri):
+        nonlocal max_seq_len, st_pos
+        while li >= 0 and ri < len_arr and abs(
+                m[li] - m[ri]) <= tolerance * 2 - tolerance / 2:
+            li -= 1
+            ri += 1
+        cur_seq_len = ri - li - 1
+        if cur_seq_len > max_seq_len:
+            max_seq_len = cur_seq_len
+            st_pos = li + 1
 
-sequence = list(map(float, input().split()))
-epsilon = float(input())
-result = find_longest_symmetric_sequence(sequence, epsilon)
-print(" ".join(map(str, result)))
+    for i in range(len_arr):
+        symmetry_check(i, i)
+        symmetry_check(i, i + 1)
+
+    return [int(x) if x == 0.0 else x for x in m[st_pos:st_pos + max_seq_len]]
+
+
+m = list(map(float, input().split()))
+sigmaboychik = 0.2
+print(" ".join(map(str, max_symmetry_find(m, sigmaboychik))))
