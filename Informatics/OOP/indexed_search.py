@@ -1,3 +1,6 @@
+import sys
+
+
 class IndexedSearch:
     def __init__(self):
         self.paths = []
@@ -6,24 +9,24 @@ class IndexedSearch:
         self.paths.append(path)
 
     def get(self, pattern):
-        def match(path_parts, pattern_parts):
-            path_idx, pattern_idx = 0, 0
+        def match(path_parts, part):
+            path_idx, index = 0, 0
 
-            while pattern_idx < len(pattern_parts):
-                if pattern_parts[pattern_idx] == "*":
-                    if pattern_idx == len(pattern_parts) - 1:
-                        return True  # Trailing * matches everything
-                    while path_idx < len(path_parts) and not match(path_parts[path_idx:], pattern_parts[pattern_idx + 1:]):
+            while index < len(part):
+                if part[index] == "*":
+                    if index == len(part) - 1:
+                        return True
+                    while path_idx < len(path_parts) and not match(path_parts[path_idx:], part[index + 1:]):
                         path_idx += 1
                     return path_idx < len(path_parts)
-                elif pattern_parts[pattern_idx] == "?":
+                elif part[index] == "?":
                     if path_idx >= len(path_parts):
                         return False
-                elif pattern_idx >= len(path_parts) or pattern_parts[pattern_idx] != path_parts[path_idx]:
+                elif index >= len(path_parts) or part[index] != path_parts[path_idx]:
                     return False
 
                 path_idx += 1
-                pattern_idx += 1
+                index += 1
 
             return path_idx == len(path_parts)
 
@@ -37,14 +40,15 @@ class IndexedSearch:
 
         return result
 
-# Example usage
-searcher = IndexedSearch()
-searcher.add("C:/folder1/folder11/file111")
-searcher.add("C:/folder1/folder11/file112")
-searcher.add("C:/folder1/folder12/file121")
-searcher.add("C:/folder2/folder22/file122")
-searcher.add("C:/folder2/folder21/file111")
 
-# Perform search
-query = "file111"
-print("\n".join(searcher.get(query)))
+input_lines = sys.stdin.read().strip().split('\n')
+indexed_search = IndexedSearch()
+
+for line in input_lines:
+    if line.startswith("find:"):
+        pattern = line[len("find:"):].strip()
+        results = indexed_search.get(pattern)
+        for result in results:
+            print(result)
+    else:
+        indexed_search.add(line.strip())
