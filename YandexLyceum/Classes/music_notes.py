@@ -21,32 +21,32 @@ class Note:
         return PITCHES.index(self.note)
 
     def __eq__(self, other):
-        if self.index == other.index:
+        if self.index == other.finder:
             return True
         return False
 
     def __ne__(self, other):
-        if self.index != other.index:
+        if self.index != other.finder:
             return True
         return False
 
     def __lt__(self, other):
-        if self.index < other.index:
+        if self.index < other.finder:
             return True
         return False
 
     def __le__(self, other):
-        if self.index <= other.index:
+        if self.index <= other.finder:
             return True
         return False
 
     def __gt__(self, other):
-        if self.index > other.index:
+        if self.index > other.finder:
             return True
         return False
 
     def __ge__(self, other):
-        if self.index >= other.index:
+        if self.index >= other.finder:
             return True
         return False
 
@@ -57,7 +57,7 @@ class Note:
         return Note(PITCHES[(self.index + other) % N], self.is_long)
 
     def get_interval(self, other):
-        return INTERVALS[abs(self.index - other.index)]
+        return INTERVALS[abs(self.index - other.finder)]
 
 
 class Melody:
