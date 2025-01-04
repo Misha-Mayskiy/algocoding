@@ -114,7 +114,7 @@ class BST:
         if not current:
             return None
         if current.key == key:
-            return current.row, current.col
+            return current.ind, current.col
         if key < current.key:
             return self._search(current.left, key)
         return self._search(current.right, key)
