@@ -1,78 +1,74 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLineEdit, QVBoxLayout, QWidget, QLabel
-from PyQt6.QtGui import QPainter, QColor
-from PyQt6.QtCore import QRectF
+
+from PyQt5.QtGui import QPainter, QColor
+from PyQt5.QtWidgets import QWidget, QApplication, QPushButton, QLabel, QLineEdit
 
 
-class Square1(QMainWindow):
+class Square1(QWidget):
     def __init__(self):
         super().__init__()
-
-        self.setWindowTitle("Квадрат-объектив — 1")
-        self.setGeometry(100, 100, 800, 900)
-        self.color = QColor(0, 0, 255)  # Синий цвет для квадратов
-
-        self.a = 300
-        self.k = 0.9
-        self.n = 10
-
         self.initUI()
 
     def initUI(self):
-        layout = QVBoxLayout()
+        self.setGeometry(0, 0, 500, 570)
+        self.setWindowTitle('Квадрат объектив 1')
 
-        # Поля для ввода параметров
-        self.lineEdit = QLineEdit(self)
-        self.lineEdit.setPlaceholderText("Размер стороны квадрата (по умолчанию 300)")
-        self.lineEdit.setText("300")
+        self.show_square = QPushButton('Показать', self)
+        self.show_square.resize(100, 30)
+        self.show_square.move(10, 15)
+        self.do_paint = False
+        self.show_square.clicked.connect(self.paint)
 
-        self.lineEdit_2 = QLineEdit(self)
-        self.lineEdit_2.setPlaceholderText("Коэффициент масштабирования (по умолчанию 0.9)")
-        self.lineEdit_2.setText("0.9")
+        self.side_text = QLabel(self)
+        self.side_text.setText('side')
+        self.side_text.move(200, 15)
 
-        self.lineEdit_3 = QLineEdit(self)
-        self.lineEdit_3.setPlaceholderText("Количество квадратов (по умолчанию 10)")
-        self.lineEdit_3.setText("10")
+        self.coeff_text = QLabel(self)
+        self.coeff_text.setText('coeff')
+        self.coeff_text.move(200, 50)
 
-        self.btn = QPushButton("Нарисовать квадраты", self)
-        self.btn.clicked.connect(self.draw_squares)
+        self.n_text = QLabel(self)
+        self.n_text.setText('n')
+        self.n_text.move(200, 85)
 
-        layout.addWidget(QLabel("Введите параметры:"))
-        layout.addWidget(self.lineEdit)
-        layout.addWidget(self.lineEdit_2)
-        layout.addWidget(self.lineEdit_3)
-        layout.addWidget(self.btn)
+        self.side = QLineEdit(self)
+        self.side.resize(150, 25)
+        self.side.move(250, 15)
 
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
+        self.coeff = QLineEdit(self)
+        self.coeff.resize(150, 25)
+        self.coeff.move(250, 50)
 
-    def draw_squares(self):
-        # Получение параметров из полей ввода
-        try:
-            self.a = int(self.lineEdit.text())
-            self.k = float(self.lineEdit_2.text())
-            self.n = int(self.lineEdit_3.text())
-        except ValueError:
-            return  # Если ввод некорректен, просто выходим из функции
-
-        # Перерисовка окна
-        self.update()
+        self.n = QLineEdit(self)
+        self.n.resize(150, 25)
+        self.n.move(250, 85)
 
     def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if self.do_paint:
+            qp = QPainter()
+            qp.begin(self)
+            self.draw(qp)
+            qp.end()
 
-        # Рисуем квадраты
-        for i in range(self.n):
-            size = self.a * (self.k ** i)  # Вычисляем размер квадрата
-            rect = QRectF(50 + (self.a - size) / 2, 130 + (self.a - size) / 2, size, size)
-            painter.setBrush(self.color)
-            painter.drawRect(rect)
+    def paint(self, event):
+        self.do_paint = True
+        self.repaint()
+
+    def draw(self, qp):
+        current_side = int(self.side.text())
+        for _ in range(int(self.n.text())):
+            current_side = int(current_side)
+            qp.setPen(QColor(255, 0, 0))
+            qp.drawRect(250 - (int(current_side) // 2),
+                        345 - (int(current_side) // 2),
+                        int(current_side),
+                        int(current_side))
+            current_side *= float(self.coeff.text())
+        self.do_paint = False
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = Square1()
-    window.show()
+    ex = Square1()
+    ex.show()
     sys.exit(app.exec())
