@@ -1,7 +1,6 @@
-MIN_RUN = 32
-
-# Сортировка вставками
-def insertion_sort(arr, left, right):
+def insertion_sort(arr, left=0, right=None):
+    if right is None:
+        right = len(arr) - 1
     for i in range(left + 1, right + 1):
         key = arr[i]
         j = i - 1
@@ -10,46 +9,47 @@ def insertion_sort(arr, left, right):
             j -= 1
         arr[j + 1] = key
 
-# Слияние двух подмассивов
-def merge(arr, left, mid, right):
-    left_part, right_part = arr[left:mid + 1], arr[mid + 1:right + 1]
-    i, j, k = 0, 0, left
-    while i < len(left_part) and j < len(right_part):
-        if left_part[i] <= right_part[j]:
-            arr[k] = left_part[i]
+
+def merge(arr, l, m, r):
+    left = arr[l:m + 1]
+    right = arr[m + 1:r + 1]
+    i = j = 0
+    k = l
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            arr[k] = left[i]
             i += 1
         else:
-            arr[k] = right_part[j]
+            arr[k] = right[j]
             j += 1
         k += 1
-    arr[k:k + len(left_part) - i] = left_part[i:]
-    arr[k:k + len(right_part) - j] = right_part[j:]
+    while i < len(left):
+        arr[k] = left[i]
+        i += 1
+        k += 1
+    while j < len(right):
+        arr[k] = right[j]
+        j += 1
+        k += 1
 
-# Основная функция Timsort
+
 def timsort(arr):
+    min_run = 32
     n = len(arr)
-
-    # Сортируем подмассивы с помощью сортировки вставками
-    for i in range(0, n, MIN_RUN):
-        insertion_sort(arr, i, min(i + MIN_RUN - 1, n - 1))
-
-    # Сливаем подмассивы
-    size = MIN_RUN
+    for start in range(0, n, min_run):
+        end = min(start + min_run - 1, n - 1)
+        insertion_sort(arr, start, end)
+    size = min_run
     while size < n:
         for left in range(0, n, 2 * size):
             mid = min(n - 1, left + size - 1)
-            right = min(n - 1, left + 2 * size - 1)
+            right = min((left + 2 * size - 1), (n - 1))
             if mid < right:
                 merge(arr, left, mid, right)
-        size *= 2
+        size = 2 * size
 
 
-import random
-lst = list(range(999999))
-random.shuffle(lst)
-random.shuffle(lst)
-random.shuffle(lst)
-print(lst)
-print(lst.sort())
-timsort(lst)
-print(lst)
+# Пример использования Timsort
+arr = [5, 21, 7, 23, 19, 1, 13, 17, 2, 29]
+timsort(arr)
+print(arr)  # Вывод: [1, 2, 5, 7, 13, 17, 19, 21, 23, 29]
