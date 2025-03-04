@@ -33,7 +33,7 @@ pymorphy3-dicts-ru
 networkx
 aiogram
 plotly
-matplotlib
+matplotlib~=3.9.2
 pyqt6
 keyboard~=0.13.5
 colorama~=0.4.6
