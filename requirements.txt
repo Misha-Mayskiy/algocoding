@@ -4,7 +4,7 @@ xlrd
 pygame
 numpy~=2.1.2
 pillow
-flask
+flask~=3.0.3
 flask-wtf
 flask-restful
 flask-sqlalchemy
@@ -39,3 +39,5 @@ keyboard~=0.13.5
 colorama~=0.4.6
 pyqtgraph~=0.13.7
 transformers~=4.48.3
+schedule~=1.2.2
+requests~=2.32.3
