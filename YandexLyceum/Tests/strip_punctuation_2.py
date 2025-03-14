@@ -1,5 +1,5 @@
 def strip_punctuation_ru(data):
-    punctuations = '!()[]{};:\'",<>./?@#$%^&*_~.«»—…'
+    punctuations = '!()[]{};:\'",<>./?@#$%^&*_~.«»…'
 
     result = ""
     for char in data:
@@ -7,5 +7,8 @@ def strip_punctuation_ru(data):
             result += ' '
         else:
             result += char
+
+    result = result.replace(' - ', ' ')
+    result = result.replace(' — ', ' ')
 
     return ' '.join(result.split())
