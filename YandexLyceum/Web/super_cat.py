@@ -1,41 +1,52 @@
-import sys
 import os
+import sys
 
-try:
+
+def main():
     args = sys.argv[1:]
+
+    count_flag = "--count" in args
+    num_flag = "--num" in args
+    sort_flag = "--sort" in args
+
+    if count_flag:
+        args.remove("--count")
+    if num_flag:
+        args.remove("--num")
+    if sort_flag:
+        args.remove("--sort")
 
     if not args:
         print("ERROR")
-        sys.exit(1)
+        return
 
-    filename = args[-1]
-    flags = args[:-1]
+    filename = args[0]
 
-    if not os.path.exists(filename):
+    if not os.path.isfile(filename):
         print("ERROR")
-        sys.exit(1)
+        return
 
-    with open(filename, 'r') as f:
-        lines = [line.rstrip('\n') for line in f]
+    try:
+        with open(filename, 'r') as file:
+            lines = file.readlines()
 
-    sort_flag = '--sort' in flags
-    count_flag = '--count' in flags
-    num_flag = '--num' in flags
+        lines = [line.rstrip('\n') for line in lines]
 
-    if sort_flag:
-        lines.sort()
+        if sort_flag:
+            lines.sort()
 
-    if num_flag:
-        numbered_lines = [f"{i} {line}" for i, line in enumerate(lines)]
-    else:
-        numbered_lines = lines.copy()
+        for i, line in enumerate(lines):
+            if num_flag:
+                print(f"{i} {line}")
+            else:
+                print(line)
 
-    for line in numbered_lines:
-        print(line)
+        if count_flag:
+            print(f"rows count: {len(lines)}")
 
-    if count_flag:
-        print(f"rows count: {len(lines)}")
+    except Exception:
+        print("ERROR")
 
-except Exception:
-    print("ERROR")
-    sys.exit(1)
+
+if __name__ == "__main__":
+    main()
