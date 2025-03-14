@@ -1,141 +1,114 @@
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+import numpy as np
+import random
 
-# Создаём фигуру и ось
-fig, ax = plt.subplots(figsize=(12, 10))
+# Обновляем карту с обозначениями и доработкой деталей
 
-# --- Наружные государства (слева и справа от Аурелии) ---
-# Государство Альтания (слева)
-state_left = patches.Rectangle((-40, 0), 40, 100, facecolor='lavender', edgecolor='black', alpha=0.5)
-ax.add_patch(state_left)
-ax.text(-20, 50, "Государство Альтания", fontsize=12, rotation=90, va='center', ha='center', color='black')
+fig, ax = plt.subplots(figsize=(12, 12))
 
-# Государство Зелестия (справа)
-state_right = patches.Rectangle((100, 0), 40, 100, facecolor='lightcyan', edgecolor='black', alpha=0.5)
-ax.add_patch(state_right)
-ax.text(120, 50, "Государство Зелестия", fontsize=12, rotation=-90, va='center', ha='center', color='black')
+# Фон карты (суша)
+ax.set_facecolor('#e0dabd')
 
-# --- Основная территория государства "Аурелия" ---
-country = patches.Rectangle((0, 0), 100, 100, linewidth=2, edgecolor='black', facecolor='lightgrey')
-ax.add_patch(country)
+# Море и океаны
+water_color = '#5d9cec'
+ax.fill_between([-1, 11], -1, 3, color=water_color, label="Море Норн")
+ax.fill_between([-1, 3], 3, 6, color=water_color, label="Западное море")
 
-# --- Внешние элементы: море, побережье ---
-# Море (внешние области)
-sea_bottom = patches.Rectangle((-50, -25), 250, 25, facecolor='skyblue', alpha=0.4)
-sea_left   = patches.Rectangle((-50, -25), 50, 150, facecolor='skyblue', alpha=0.4)
-ax.add_patch(sea_bottom)
-ax.add_patch(sea_left)
+# Озёра
+lake_positions = [(6, 7, 1), (8, 5, 0.8)]
+for x, y, r in lake_positions:
+    circle = plt.Circle((x, y), r, color=water_color, ec="black", label="Озеро" if x == 6 else "")
+    ax.add_patch(circle)
 
-# Побережье (южняя и западная границы страны)
-ax.plot([0, 100], [0, 0], color='blue', linewidth=4)  # южная граница
-ax.plot([0, 0], [0, 100], color='blue', linewidth=4)  # западная граница
+# Река Вальдис
+river_x = [5, 5.5, 6, 6.2, 6.5, 6.8, 7]
+river_y = [10, 9, 8, 7, 6, 5, 4]
+ax.plot(river_x, river_y, color=water_color, linewidth=3, label="Река Вальдис")
 
-# --- Внутренние элементы страны "Аурелия" ---
-# Острова
-island1 = patches.Circle((10, 10), 3, facecolor='yellow', edgecolor='black')
-island2 = patches.Circle((90, 90), 3, facecolor='yellow', edgecolor='black')
-ax.add_patch(island1)
-ax.add_patch(island2)
+# Горы Айронкрест (северо-восток)
+for _ in range(8):
+    x, y = random.uniform(7, 10), random.uniform(7, 10)
+    ax.scatter(x, y, marker="^", color="gray", s=100, label="Горы" if _ == 0 else "")
 
-# Полуостров (на востоке)
-peninsula = patches.Polygon([[100, 40], [120, 50], [100, 60]], closed=True, facecolor='lightblue', edgecolor='black')
-ax.add_patch(peninsula)
+# Пустыня Орим (юг)
+for _ in range(50):
+    x, y = random.uniform(4, 8), random.uniform(0, 3)
+    ax.scatter(x, y, marker=".", color="sandybrown", alpha=0.6, label="Пустыня" if _ == 0 else "")
 
-# Озёра (в центральной части)
-lake1 = patches.Circle((50, 70), 5, facecolor='deepskyblue', edgecolor='black')
-lake2 = patches.Circle((70, 30), 4, facecolor='deepskyblue', edgecolor='black')
-ax.add_patch(lake1)
-ax.add_patch(lake2)
+# Лес Тенарис (север)
+for _ in range(50):
+    x, y = random.uniform(2, 6), random.uniform(7, 10)
+    ax.scatter(x, y, marker="*", color="darkgreen", s=50, label="Лес" if _ == 0 else "")
 
-# Реки (извилистая синяя линия)
-ax.annotate("",
-            xy=(20, 0), xycoords='data',
-            xytext=(80, 100), textcoords='data',
-            arrowprops=dict(arrowstyle="->", color='blue', lw=2, connectionstyle="arc3,rad=-0.5"))
+# Степи Сольвейг (запад)
+for _ in range(50):
+    x, y = random.uniform(0, 3), random.uniform(4, 8)
+    ax.scatter(x, y, marker=".", color="yellowgreen", alpha=0.5, label="Степи" if _ == 0 else "")
 
-# Леса (зелёные прямоугольники)AAaaaasaz
-forest1 = patches.Rectangle((20, 20), 20, 20, facecolor='green', alpha=0.5)
-forest2 = patches.Rectangle((60, 60), 20, 20, facecolor='green', alpha=0.5)
-ax.add_patch(forest1)
-ax.add_patch(forest2)
+# Полуостров Кассия (восток)
+ax.fill_between([7, 10], 2, 4, color='#e0dabd', label="Полуостров Кассия")
 
-# Горы (на северо-востоке)
-mountains = patches.Polygon([[70, 80], [80, 95], [90, 80]], closed=True, facecolor='saddlebrown', edgecolor='black')
-ax.add_patch(mountains)
+# Острова Мист (юго-запад)
+island_positions = [(1, 1), (1.5, 1.5), (2, 0.5)]
+for x, y in island_positions:
+    circle = plt.Circle((x, y), 0.3, color='#e0dabd', ec="black", label="Острова" if x == 1 else "")
+    ax.add_patch(circle)
 
-# Пустыни (на юго-востоке)
-desert = patches.Rectangle((60, 0), 40, 30, facecolor='khaki', hatch='//', edgecolor='black', alpha=0.6)
-ax.add_patch(desert)
+# Автономии и этнические зоны
+ax.scatter(4, 7, color="purple", s=100, label="Автономия Дракенхольм", marker="s")
+ax.scatter(3, 5, color="orange", s=100, label="Зона диаспор Лисмир", marker="s")
 
-# Степи (на западе)
-steppes = patches.Rectangle((0, 40), 20, 40, facecolor='lightyellow', edgecolor='black', alpha=0.5)
-ax.add_patch(steppes)
+# Экономически важные зоны
+ax.scatter(6, 3, color="black", s=100, label="Шахты Карнас", marker="X")
+ax.scatter(7, 6, color="brown", s=100, label="Плодородные земли Иллион", marker="o")
+ax.scatter(3, 3, color="blue", s=100, label="Торговый порт Вестгард", marker="D")
+ax.scatter(6, 5, color="red", s=100, label="Город-государство Арктон", marker="P")
 
-# Пашни (плодородные поля, обозначенные золотыми линиями)
-for i in range(5):
-    ax.plot([30, 80], [10 + i*2, 10 + i*2], color='goldenrod', linewidth=1)
+# Политическая столица
+ax.scatter(5, 5, color="gold", s=200, label="Столица Аурелии", marker="*")
 
-# Ресурсы (месторождения, обозначенные звёздами)
-ax.text(15, 85, '★', fontsize=20, color='red')
-ax.text(85, 15, '★', fontsize=20, color='red')
+# Добавление границ соседних государств
+ax.plot([-1, 11], [10, 10], color="black", linestyle="--", label="Граница с Бореалией")
+ax.plot([0, 0], [0, 10], color="black", linestyle="--", label="Граница с Альтанией")
+ax.plot([10, 10], [0, 10], color="black", linestyle="--", label="Граница с Зелестией")
 
-# Автономные регионы (выделены пунктирными рамками)
-autonomous = patches.Rectangle((65, 65), 20, 20, linewidth=2, edgecolor='purple', linestyle='--', facecolor='none')
-ax.add_patch(autonomous)
+# Подписи географических объектов
+labels = {
+    (5, 1): "Пустыня Орим",
+    (5, 9): "Река Вальдис",
+    (7, 8): "Горы Айронкрест",
+    (6, 6): "Озеро Луминос",
+    (8, 5): "Озеро Сапфир",
+    (3, 8): "Лес Тенарис",
+    (1, 6): "Степи Сольвейг",
+    (9, 3): "Полуостров Кассия",
+    (1, 2): "Острова Мист",
+    (4, 7): "Автономия Дракенхольм",
+    (3, 5): "Зона диаспор Лисмир",
+    (6, 3): "Шахты Карнас",
+    (7, 6): "Плодородные земли Иллион",
+    (3, 3): "Торговый порт Вестгард",
+    (6, 5): "Город-государство Арктон",
+    (5, 5): "Аурелия (столица)",
+}
 
-# Диаспоры (области проживания этнических меньшинств)
-ax.plot(40, 50, marker='o', color='magenta', markersize=10)
-ax.text(42, 50, "Диаспора", fontsize=8, color='magenta')
+for (x, y), name in labels.items():
+    ax.text(x, y, name, fontsize=9, ha='center', va='center', bbox=dict(facecolor='white', alpha=0.7))
 
-# Разделительные этносы (внутренние этнические границы – пунктирная линия)
-ax.plot([0, 100], [55, 55], color='black', linestyle=':', linewidth=2)
+# Названия соседних государств
+ax.text(5, 10.5, "БОреалия", fontsize=12, ha='center', va='center', fontweight='bold', color='black')
+ax.text(-0.5, 5, "Альтания", fontsize=12, ha='center', va='center', fontweight='bold', rotation=90, color='black')
+ax.text(10.5, 5, "Зелестия", fontsize=12, ha='center', va='center', fontweight='bold', rotation=-90, color='black')
 
-# Буферное положение (зона демилитаризации, отображённая щитом и подписью)
-ax.text(50, 98, "🛡", fontsize=20, ha='center')
-ax.text(50, 105, "Буферное положение", fontsize=12, ha='center', color='darkblue')
+# Убираем оси
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_xlim(-1, 11)
+ax.set_ylim(-1, 11)
 
-# Приграничное положение (утолщённые границы)
-ax.plot([0, 0], [0, 100], color='red', linewidth=4)
-ax.plot([100, 100], [0, 100], color='red', linewidth=4)
+# Легенда карты
+ax.legend(loc="upper right", fontsize=8, frameon=True, facecolor="white")
 
-# --- Бонусные элементы ---
-# Государства-города (мегаполис)
-ax.plot(50, 50, marker='s', color='black', markersize=12)
-ax.text(52, 50, "Город", fontsize=10, va='center')
-
-# Комплементарные этносы (две переплетённые окружности)
-comp1 = patches.Circle((30, 80), 4, facecolor='cyan', edgecolor='black', alpha=0.5)
-comp2 = patches.Circle((34, 80), 4, facecolor='magenta', edgecolor='black', alpha=0.5)
-ax.add_patch(comp1)
-ax.add_patch(comp2)
-
-# Сильная исполнительная власть (столица)
-ax.plot(50, 90, marker='*', color='gold', markersize=15)
-ax.text(52, 92, "Столица", fontsize=10, color='darkblue')
-
-# Военный флот (символ корабля на побережье)
-ax.text(5, -5, "⛵", fontsize=20)
-
-# Миротворчество (символ мира – олива)
-ax.text(90, 95, "☮", fontsize=20, color='green')
-
-# --- Штрафные элементы ---
-# Лингвистические чуждые (обозначены знаком «?»)
-ax.text(80, 70, "?", fontsize=16, color='brown')
-
-# Некомплементарные этносы (области конфликтов – красные пятна)
-ax.add_patch(patches.Rectangle((10, 10), 10, 10, facecolor='red', alpha=0.3))
-
-# Сепаратисты (обозначены треугольником с восклицательным знаком)
-ax.text(80, 10, "▲!", fontsize=14, color='darkred')
-
-# Террористическzzzzzzzzxxxxx xxxxxxsssssssssssssssssssss1ая активность (обозначена как «!!!»)
-ax.text(30, 30, "!!!", fontsize=14, color='red')
-
-# Настройки отображения
-ax.set_xlim(-50, 150)
-ax.set_ylim(-25, 130)
-ax.set_aspect('equal')
-plt.title("Карта государства «Аурелия» с приграничными соседями")
-plt.axis('off')
+# Показываем карту
+plt.title("Карта государства Аурелия (с детализацией)")
 plt.show()
