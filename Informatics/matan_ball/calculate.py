@@ -166,8 +166,8 @@ def calculate_rating():
     sum_components = d_a + colloquium_contribution + s_a_sum + k_a_sum
     print(
         f"   Сумма компонентов = D(A) + (C-2) + ΣS_i + ΣK_i = {d_a:.4f} + {colloquium_contribution:.4f} + {s_a_sum:.4f} + {k_a_sum:.4f} = {sum_components:.4f}")
-    r_a = 40.0 * sum_components / 6.0
-    print(f"   r(A) = 40 * {sum_components:.4f} / 6 = {r_a:.4f}")
+    r_a = 40.0 * sum_components
+    print(f"   r(A) = 40 * {sum_components:.4f} = {r_a:.4f}")
     print(f"   (Максимальный рейтинг за семестр r(A) = 600)")
 
     # 6. Exam Contribution 100 * (E - 1)
