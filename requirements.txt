@@ -1,7 +1,7 @@
 python-pptx~=1.0.2
 xlsxwriter
 xlrd
-pygame
+pygame~=2.6.1
 numpy~=2.1.2
 pillow
 flask~=3.0.3
@@ -11,7 +11,7 @@ flask-sqlalchemy
 PyQT5~=5.15.11
 PyQt6~=6.7.1
 pylint
-pytest
+pytest~=8.3.3
 python-telegram-bot
 openpyxl~=3.1.5
 PyQt5-sip
@@ -41,3 +41,4 @@ pyqtgraph~=0.13.7
 transformers~=4.48.3
 schedule~=1.2.2
 requests~=2.32.3
+SQLAlchemy~=2.0.35
