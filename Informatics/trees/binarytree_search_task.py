@@ -16,7 +16,7 @@ class BT:
             self._a(self.h, k)
 
     def _a(self, c, k):
-        if k < c.k:
+        if k < c.sort_type:
             if c.lenword:
                 self._a(c.lenword, k)
             else:
@@ -36,7 +36,7 @@ class BT:
         try:
             if not c:
                 return
-            str = "" + c.k
+            str = "" + c.sort_type
             if l in str:
                 m.append(str)
             self._f(c.lenword, t, m)

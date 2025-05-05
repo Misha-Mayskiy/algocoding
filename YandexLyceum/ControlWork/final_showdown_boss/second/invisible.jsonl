@@ -1,0 +1,3 @@
+{"name": "Kaimo", "things": ["Fan", "Fan"], "places": ["hall", "house"], "ave_degree": 13, "max_degree": 20}
+{"name": "Zepar", "things": ["Alarm", "Aquarium", "Chandelier", "Clock"], "places": ["hall", "hall", "kitchen", "living"], "ave_degree": 13, "max_degree": 18}
+{"name": "Forneus", "things": ["Refrigerator"], "places": ["hall"], "ave_degree": 8, "max_degree": 8}

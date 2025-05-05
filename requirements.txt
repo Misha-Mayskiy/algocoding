@@ -3,7 +3,7 @@ xlsxwriter
 xlrd
 pygame~=2.6.1
 numpy~=2.1.2
-pillow
+pillow~=10.4.0
 flask~=3.0.3
 flask-wtf
 flask-restful
@@ -42,3 +42,4 @@ transformers~=4.48.3
 schedule~=1.2.2
 requests~=2.32.3
 SQLAlchemy~=2.0.35
+WTForms~=3.1.2
