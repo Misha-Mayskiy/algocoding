@@ -5,7 +5,7 @@ class TLogElement:
         self._res = False
         if not hasattr(self, "calc"):
             raise NotImplementedError("Нельзя создать такой объект!")
-        self.__nextEl=None
+        self.__nextEl = None
         self.__nextIn = 0
 
     def __setIn1(self, newIn1):
@@ -64,5 +64,3 @@ class TOr(TLog2In):
 
     def calc(self):
         self._res = self.In1 or self.In2
-
-
