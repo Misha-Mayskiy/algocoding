@@ -43,7 +43,8 @@ def login_and_get_session():
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
         'Referer': LOGIN_URL,
-        'Accept-Language': 'ru-RU,ru;q=0.9'
+        'Accept-Language': 'ru-RU,ru;q=0.9',
+        'Origin': BASE_URL
     })
 
     login_data = {'username': GODVILLE_LOGIN, 'password': GODVILLE_PASSWORD, 'login': 'Войти'}
@@ -85,7 +86,7 @@ def get_websocket_url():
 
         decoded_data = json.loads(base64.b64decode(axe_div.text.strip()).decode('utf-8'))
 
-        url_raw = decoded_data.get(WEBSOCKET_URL_KEY)
+        url_raw = decoded_data.get(WEBSOCKET_URL_KEY) or decoded_data.get('u')
         if not url_raw:
             logging.error(f"Ключ '{WEBSOCKET_URL_KEY}' не найден в данных 'axe'.")
             return None, None
@@ -126,9 +127,8 @@ async def send_actions():
     """Асинхронно отправляет команды влияния, имитируя человеческое поведение."""
     while not shutdown_event.is_set():
         try:
-            # С вероятностью 10% бот "уснёт" на 1-4 часа
             if random.randint(1, 10) == 1:
-                sleep_duration = random.uniform(3600, 14400)
+                sleep_duration = random.uniform(3600, 14400)  # 1-4 часа
                 logging.info(f"Имитация сна. Пауза на {sleep_duration / 3600:.1f} часов.")
                 await asyncio.sleep(sleep_duration)
 
@@ -165,7 +165,7 @@ async def main_manager():
                 await sio.connect(
                     url,
                     transports=['websocket'],
-                    headers={'Cookie': '; '.join([f'{k}={v}' for k, v in cookies.items()])},
+                    headers={'Cookie': '; '.join([f'{k}={v}' for k, v in cookies.items()]), 'Origin': BASE_URL},
                     socketio_path=path
                 )
 
@@ -173,13 +173,17 @@ async def main_manager():
 
                 action_task = asyncio.create_task(send_actions())
                 await shutdown_event.wait()
-                action_task.cancel()
-                await sio.disconnect()
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logging.error(f"Ошибка подключения к Socket.IO: {e}")
+            finally:
+                if sio.connected:
+                    await sio.disconnect()
+                if 'action_task' in locals() and not action_task.done():
+                    action_task.cancel()
+                    await asyncio.sleep(0)  # Даем шанс задаче отмениться
 
         logging.info(f"Повторная попытка через {backoff_delay} секунд.")
         await asyncio.sleep(backoff_delay)
