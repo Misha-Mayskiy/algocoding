@@ -21,8 +21,8 @@ SUPERHERO_URL = 'https://godville.net/superhero'
 BASE_URL = 'https://godville.net'
 LOGIN_SUCCESS_CHECK_ELEMENT_ID = 'axe'
 WEBSOCKET_URL_KEY = 'u1'
-MIN_ACTION_INTERVAL_SEC = 120
-MAX_ACTION_INTERVAL_SEC = 300
+MIN_ACTION_INTERVAL_SEC = 10
+MAX_ACTION_INTERVAL_SEC = 30
 RESTART_INITIAL_DELAY_SEC = 15
 RESTART_MAX_DELAY_SEC = 300
 
@@ -125,14 +125,16 @@ async def websocket_logic(uri, cookies):
 
     tasks = []
     try:
-        async with websockets.connect(uri, extra_headers=headers) as websocket:
+        # Используем встроенный механизм ping библиотеки, он надежнее.
+        async with websockets.connect(uri, extra_headers=headers, open_timeout=20, close_timeout=10, ping_interval=25,
+                                      ping_timeout=20) as websocket:
             logging.info("\nУспешно подключено к WebSocket серверу. Начинаю работу.")
+            await asyncio.sleep(2)
 
             listen_task = asyncio.create_task(listen_server(websocket))
             action_task = asyncio.create_task(send_actions(websocket))
-            ping_task = asyncio.create_task(send_pings(websocket))
 
-            tasks = [listen_task, action_task, ping_task]
+            tasks = [listen_task, action_task]
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
                 exc = task.exception()
@@ -157,6 +159,19 @@ async def listen_server(websocket):
         logging.info(f"<-- Получено от сервера: {message}")
 
 
+async def send_framed_message(websocket, command):
+    """Оборачивает JSON-сообщение в специальный фрейм, который ожидает сервер."""
+    payload = json.dumps(command, separators=(',', ':'))
+    # ИСПРАВЛЕНИЕ: Длина фрейма - это просто длина JSON-сообщения + 1 (для типа).
+    length = len(payload) + 1
+    # Формируем заголовок: 7-значная длина, дополненная пробелами, и тип '0'
+    header = str(length).rjust(7) + "0"
+
+    framed_message = header + payload
+    await websocket.send(framed_message)
+    logging.info(f"--> Отправлена команда в фрейме: {framed_message}")
+
+
 async def send_actions(websocket):
     """Асинхронно отправляет команды влияния, имитируя человеческое поведение."""
     while True:
@@ -173,27 +188,12 @@ async def send_actions(websocket):
             action = random.choice(["good", "bad"])
             command = {"type": "god_action", "action": action}
 
-            await websocket.send(json.dumps(command))
-            logging.info(f"--> Отправлена команда: {json.dumps(command)}")
+            await send_framed_message(websocket, command)
 
         except asyncio.CancelledError:
             break
         except websockets.exceptions.ConnectionClosed:
             logging.warning("--> Попытка отправки команды не удалась: соединение закрыто.")
-            break
-
-
-async def send_pings(websocket):
-    """Периодически отправляет ping-сообщения для поддержания соединения."""
-    while True:
-        try:
-            await asyncio.sleep(45)
-            await websocket.send("2")  # Пользовательский ping-сигнал
-            logging.info("--> Отправлен ping-сигнал.")
-        except asyncio.CancelledError:
-            break
-        except websockets.exceptions.ConnectionClosed:
-            logging.warning("--> Попытка отправки ping не удалась: соединение закрыто.")
             break
 
 

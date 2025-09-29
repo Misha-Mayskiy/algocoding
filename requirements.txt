@@ -1,7 +1,6 @@
 websockets
 python-dotenv
 beautifulsoup4
-python-socketio
 python-pptx
 xlsxwriter
 xlrd
