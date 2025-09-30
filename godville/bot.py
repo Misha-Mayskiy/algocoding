@@ -1,207 +1,310 @@
-import requests
-import base64
-import json
 import asyncio
-import websockets
-import random
 import os
+import random
 import logging
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
+from pathlib import Path
 
-# --- Конфигурация и константы ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from dotenv import load_dotenv
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
+# ===================== Конфиг =====================
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 GODVILLE_LOGIN = os.getenv('GODVILLE_LOGIN')
 GODVILLE_PASSWORD = os.getenv('GODVILLE_PASSWORD')
 
-LOGIN_URL = 'https://godville.net/login/login'
-SUPERHERO_URL = 'https://godville.net/superhero'
-BASE_URL = 'https://godville.net'
-LOGIN_SUCCESS_CHECK_ELEMENT_ID = 'axe'
-WEBSOCKET_URL_KEY = 'u1'
-MIN_ACTION_INTERVAL_SEC = 10
-MAX_ACTION_INTERVAL_SEC = 30
-RESTART_INITIAL_DELAY_SEC = 15
-RESTART_MAX_DELAY_SEC = 300
+HEADLESS_MODE = os.getenv('HEADLESS', '0').lower() in ('1', 'true', 'yes', 'y')
+LOG_PAGE_CONSOLE = os.getenv('LOG_PAGE_CONSOLE', '0').lower() in ('1', 'true', 'yes', 'y')  # логи из консоли страницы
+FILTER_CONSOLE_NOISE = True  # фильтр шумных сообщений (GTM/GA/CSP) если LOG_PAGE_CONSOLE включен
+BLOCK_TRACKERS = os.getenv('BLOCK_TRACKERS', '1').lower() in ('1', 'true', 'yes', 'y')  # блокируем трекеры
 
-# --- Глобальные переменные для управления сессией ---
-session = None
-websocket_url = None
+STATE_PATH = Path("state.json")
+
+LOGIN_URL = 'https://godville.net/login'
+HERO_URL = 'https://godville.net/superhero'
+
+# Интервалы между действиями (сек)
+MIN_ACTION_INTERVAL_SEC = int(os.getenv('MIN_ACTION_INTERVAL_SEC', '120'))
+MAX_ACTION_INTERVAL_SEC = int(os.getenv('MAX_ACTION_INTERVAL_SEC', '300'))
+
+# Иногда имитируем «сон»
+SLEEP_PROBABILITY = float(os.getenv('SLEEP_PROBABILITY', '0.1'))
+SLEEP_MIN_SEC = int(os.getenv('SLEEP_MIN_SEC', '3600'))  # 1 час
+SLEEP_MAX_SEC = int(os.getenv('SLEEP_MAX_SEC', '10800'))  # 3 часа
+
+USER_AGENT = os.getenv('USER_AGENT',
+                       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36')
+LOCALE = os.getenv('LOCALE', 'ru-RU')
+
+TRACKER_BLOCK_LIST = [
+    '*://*.googletagmanager.com/*',
+    '*://*.google-analytics.com/*',
+    '*://*.doubleclick.net/*',
+    '*://*.g.doubleclick.net/*',
+    '*://www.google.com/ccm/*',
+]
 
 
-# --- Шаг 1: Авторизация ---
-def login_and_get_session():
-    """Выполняет вход на сайт и сохраняет сессию. Возвращает True в случае успеха."""
-    global session
-    if session:
-        session.close()
-
-    session = requests.Session()
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-        'Referer': LOGIN_URL,
-        'Accept-Language': 'ru-RU,ru;q=0.9',
-        'Origin': BASE_URL
-    })
-
-    login_data = {'username': GODVILLE_LOGIN, 'password': GODVILLE_PASSWORD, 'login': 'Войти'}
-
-    logging.info("Попытка авторизации...")
+# ===================== Утилиты =====================
+async def click_if_visible(page, selector: str, timeout: int = 1500) -> bool:
     try:
-        login_response = session.post(LOGIN_URL, data=login_data, timeout=15, allow_redirects=True)
-        login_response.raise_for_status()
-
-        if LOGIN_SUCCESS_CHECK_ELEMENT_ID not in login_response.text:
-            logging.error("Ошибка авторизации. Проверьте логин/пароль.")
+        loc = page.locator(selector).first
+        if await loc.count() == 0:
             return False
+        if await loc.is_visible():
+            await loc.click(timeout=timeout)
+            return True
+    except Exception:
+        return False
+    return False
 
-        logging.info("Авторизация прошла успешно.")
-        return True
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Сетевая ошибка при авторизации: {e}")
+
+async def dismiss_cookie_banners(page):
+    candidates = [
+        'button:has-text("Принять")',
+        'button:has-text("Соглас")',
+        'button:has-text("OK")',
+        'button:has-text("ОК")',
+        'button:has-text("Accept")',
+        'button:has-text("I agree")',
+        'text=Принять',
+        'text=Соглас',
+        'text=Accept',
+        'text=I agree',
+    ]
+    for sel in candidates:
+        if await click_if_visible(page, sel):
+            logging.info(f"Закрыл баннер по селектору: {sel}")
+            await asyncio.sleep(0.2)
+
+
+async def save_debug(page, prefix="debug"):
+    png = f"{prefix}.png"
+    html = f"{prefix}.html"
+    try:
+        await page.screenshot(path=png, full_page=True)
+        with open(html, "w", encoding="utf-8") as f:
+            f.write(await page.content())
+        logging.info(f"Сохранил отладочные файлы: {png}, {html}")
+    except Exception as e:
+        logging.warning(f"Не удалось сохранить отладочные файлы: {e}")
+
+
+def attach_console_logger(page):
+    if not LOG_PAGE_CONSOLE:
+        return
+
+    noise_keywords = (
+        'googletagmanager', 'google-analytics', 'doubleclick',
+        'Content Security Policy', 'CSP', "Refused to connect", "Refused to frame",
+        "Failed to execute 'postMessage'"
+    )
+
+    def _on_console(msg):
+        try:
+            text = msg.text
+        except Exception:
+            text = ''
+        try:
+            loc = msg.location
+            src = loc.get('url', '')
+        except Exception:
+            src = ''
+        if FILTER_CONSOLE_NOISE:
+            if any(k in text or k in src for k in noise_keywords):
+                return
+        logging.info(f"[console] {msg.type}: {text}")
+
+    page.on("console", _on_console)
+
+
+async def setup_blocking_routes(context):
+    if not BLOCK_TRACKERS:
+        return
+
+    async def _block(route):
+        try:
+            await route.abort()
+        except Exception:
+            pass
+
+    for pattern in TRACKER_BLOCK_LIST:
+        await context.route(pattern, _block)
+
+
+# ===================== Логин/сессия =====================
+async def perform_login(page, login: str, password: str) -> bool:
+    logging.info("Открываю страницу логина...")
+    await page.goto(LOGIN_URL, wait_until="domcontentloaded")
+    await dismiss_cookie_banners(page)
+
+    # Ждём появления формы
+    await page.wait_for_selector('form[action="/login"], input[name], button[type="submit"]', timeout=20000)
+
+    # Поля/кнопка с запасом по селекторам
+    user_sel = 'input[name="username"], input[name="login"], #username, form[action="/login"] input[type="text"]'
+    pass_sel = 'input[name="password"], #password, form[action="/login"] input[type="password"]'
+    submit_sel = 'button:has-text("Войти"), input[type="submit"], button[type="submit"]'
+
+    logging.info("Ввожу логин и пароль...")
+    await page.locator(user_sel).first.fill(login)
+    await page.locator(pass_sel).first.fill(password)
+
+    logging.info("Жму «Войти» и жду переход...")
+    try:
+        async with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            await page.locator(submit_sel).first.click()
+    except PlaywrightTimeoutError:
+        logging.warning("Навигации после сабмита не было — продолжаю проверку...")
+
+    # Переходим на страницу героя и валидируем
+    await page.goto(HERO_URL, wait_until="domcontentloaded")
+
+    if "login" in page.url:
+        logging.error("Похоже, логин не удался — всё ещё на /login.")
+        await save_debug(page, "login_failed")
         return False
 
-
-# --- Шаг 2: Получение URL для WebSocket ---
-def get_websocket_url():
-    """Извлекает и декодирует URL для подключения. Возвращает URL."""
-    global websocket_url
-    logging.info("Получение URL для WebSocket...")
+    # Ждём ключевые элементы страницы героя
     try:
-        hero_page_response = session.get(SUPERHERO_URL, timeout=15)
-        hero_page_response.raise_for_status()
+        await page.wait_for_selector('#cntrl1, #god_name, #cntrl', timeout=20000)
+    except PlaywrightTimeoutError:
+        logging.error("Не дождался элементов страницы героя после логина.")
+        await save_debug(page, "hero_wait_failed")
+        return False
 
-        if LOGIN_SUCCESS_CHECK_ELEMENT_ID not in hero_page_response.text:
-            logging.warning("Сессия могла истечь. Не удалось подтвердить авторизацию.")
-            return None
-
-        soup = BeautifulSoup(hero_page_response.text, 'html.parser')
-        axe_div = soup.find('div', {'id': LOGIN_SUCCESS_CHECK_ELEMENT_ID})
-
-        if not axe_div:
-            logging.error("Не удалось найти элемент 'axe' на странице.")
-            return None
-
-        decoded_data = json.loads(base64.b64decode(axe_div.text.strip()).decode('utf-8'))
-
-        url = decoded_data.get(WEBSOCKET_URL_KEY) or decoded_data.get('u')
-        if not url:
-            logging.error(f"Ключ для URL не найден в данных 'axe'.")
-            return None
-
-        websocket_url = url
-        logging.info(f"URL для WebSocket успешно получен: {websocket_url}")
-        return url
-    except Exception as e:
-        logging.error(f"Ошибка при получении или обработке URL: {e}")
-        return None
+    logging.info("Авторизация прошла успешно.")
+    return True
 
 
-# --- Шаг 3: Основная логика ---
-async def main_manager():
-    """Главный управляющий процесс. Перезапускает всё с нуля, если что-то пошло не так."""
-    backoff_delay = RESTART_INITIAL_DELAY_SEC
+async def ensure_logged_in(context, page, login, password) -> bool:
+    await page.goto(HERO_URL, wait_until="domcontentloaded")
+    if "login" in page.url:
+        logging.info("Сессии нет — логинюсь.")
+        ok = await perform_login(page, login, password)
+        if ok:
+            try:
+                await context.storage_state(path=str(STATE_PATH))
+                logging.info(f"Сессия сохранена в {STATE_PATH}")
+            except Exception as e:
+                logging.warning(f"Не удалось сохранить сессию: {e}")
+        return ok
+    logging.info("Сессия активна.")
+    return True
 
-    while True:
-        if login_and_get_session() and (ws_url := get_websocket_url()):
-            cookies = session.cookies.get_dict()
-            await websocket_logic(ws_url, cookies)
 
-        logging.info(f"Повторная попытка через {backoff_delay} секунд.")
-        await asyncio.sleep(backoff_delay)
-        backoff_delay = min(backoff_delay * 1.5, RESTART_MAX_DELAY_SEC)
+# ===================== Действия =====================
+async def click_prana_action(page) -> bool:
+    # Если не на странице героя — зайдём
+    if "superhero" not in page.url:
+        await page.goto(HERO_URL, wait_until="domcontentloaded")
 
-
-async def websocket_logic(uri, cookies):
-    """Управляет WebSocket соединением. При разрыве возвращает управление менеджеру."""
-    cookie_str = '; '.join([f'{name}={value}' for name, value in cookies.items()])
-    headers = {
-        'Cookie': cookie_str,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-        'Origin': BASE_URL
-    }
-
-    tasks = []
+    # Лёгкое обновление, чтобы подтянуть актуальное состояние
     try:
-        # Используем встроенный механизм ping библиотеки, он надежнее.
-        async with websockets.connect(uri, extra_headers=headers, open_timeout=20, close_timeout=10, ping_interval=25,
-                                      ping_timeout=20) as websocket:
-            logging.info("\nУспешно подключено к WebSocket серверу. Начинаю работу.")
-            await asyncio.sleep(2)
+        await page.reload(wait_until="domcontentloaded")
+    except Exception:
+        pass
 
-            listen_task = asyncio.create_task(listen_server(websocket))
-            action_task = asyncio.create_task(send_actions(websocket))
+    actions = [
+        ('#cntrl1 a.enc_link', 'Сделать хорошо'),
+        ('#cntrl1 a.pun_link', 'Сделать плохо'),
+        ('#cntrl a.enc_link', 'Сделать хорошо'),
+        ('#cntrl a.pun_link', 'Сделать плохо'),
+    ]
 
-            tasks = [listen_task, action_task]
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for task in done:
-                exc = task.exception()
-                if exc:
-                    raise exc
+    is_good = random.choice([True, False])
+    ordered = [a for a in actions if ('enc_link' in a[0]) == is_good] + [a for a in actions if
+                                                                         ('enc_link' in a[0]) != is_good]
 
-    except websockets.exceptions.ConnectionClosed as e:
-        logging.warning(f"Соединение WebSocket было закрыто сервером: {e}. Перезапускаюсь.")
-    except Exception as e:
-        logging.error(f"Произошла ошибка в работе WebSocket: {e}. Перезапускаюсь.")
-    finally:
-        for task in tasks:
-            if not task.done():
-                task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-
-async def listen_server(websocket):
-    """Асинхронно принимает и выводит сообщения от сервера."""
-    async for message in websocket:
-        logging.info(f"<-- Получено от сервера: {message}")
-
-
-async def send_framed_message(websocket, command):
-    """Оборачивает JSON-сообщение в специальный фрейм, который ожидает сервер."""
-    payload = json.dumps(command, separators=(',', ':'))
-    # ИСПРАВЛЕНИЕ: Длина фрейма - это просто длина JSON-сообщения + 1 (для типа).
-    length = len(payload) + 1
-    # Формируем заголовок: 7-значная длина, дополненная пробелами, и тип '0'
-    header = str(length).rjust(7) + "0"
-
-    framed_message = header + payload
-    await websocket.send(framed_message)
-    logging.info(f"--> Отправлена команда в фрейме: {framed_message}")
-
-
-async def send_actions(websocket):
-    """Асинхронно отправляет команды влияния, имитируя человеческое поведение."""
-    while True:
+    for selector, title in ordered:
+        loc = page.locator(selector).first
+        if await loc.count() == 0:
+            continue
         try:
-            if random.randint(1, 10) == 1:
-                sleep_duration = random.uniform(3600, 14400)  # 1-4 часа
-                logging.info(f"Имитация сна. Пауза на {sleep_duration / 3600:.1f} часов.")
-                await asyncio.sleep(sleep_duration)
+            if await loc.is_visible():
+                logging.info(f"Нажимаю «{title}» ({selector})")
+                await loc.click()
+                await asyncio.sleep(random.uniform(1.0, 2.0))
+                return True
+        except Exception as e:
+            logging.debug(f"Не удалось нажать {title}: {e}")
+            continue
 
-            wait_time = random.uniform(MIN_ACTION_INTERVAL_SEC, MAX_ACTION_INTERVAL_SEC)
-            logging.info(f"--> Следующее влияние через {wait_time:.0f} сек.")
-            await asyncio.sleep(wait_time)
-
-            action = random.choice(["good", "bad"])
-            command = {"type": "god_action", "action": action}
-
-            await send_framed_message(websocket, command)
-
-        except asyncio.CancelledError:
-            break
-        except websockets.exceptions.ConnectionClosed:
-            logging.warning("--> Попытка отправки команды не удалась: соединение закрыто.")
-            break
+    logging.info("Кнопок траты праны нет или они недоступны.")
+    return False
 
 
-# --- Точка входа в программу ---
-if __name__ == "__main__":
+# ===================== Основной цикл =====================
+async def run_bot():
     if not GODVILLE_LOGIN or not GODVILLE_PASSWORD:
-        exit()
+        logging.error("Не найдены GODVILLE_LOGIN / GODVILLE_PASSWORD в .env")
+        return
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=HEADLESS_MODE)
+        context_kwargs = dict(
+            user_agent=USER_AGENT,
+            locale=LOCALE,
+            extra_http_headers={"Accept-Language": f"{LOCALE},ru;q=0.9,en;q=0.8"},
+        )
+        if STATE_PATH.exists():
+            context_kwargs["storage_state"] = str(STATE_PATH)
+
+        context = await browser.new_context(**context_kwargs)
+        await setup_blocking_routes(context)
+
+        page = await context.new_page()
+        page.set_default_timeout(20000)
+        attach_console_logger(page)
+
+        try:
+            # Авторизация/сессия
+            ok = await ensure_logged_in(context, page, GODVILLE_LOGIN, GODVILLE_PASSWORD)
+            if not ok:
+                logging.error("Не удалось авторизоваться. Останавливаюсь.")
+                return
+
+            # Цикл действий
+            while True:
+                # Иногда «спим», имитируя оффлайн
+                if random.random() < SLEEP_PROBABILITY:
+                    nap = random.uniform(SLEEP_MIN_SEC, SLEEP_MAX_SEC)
+                    logging.info(f"Имитация сна на {nap / 3600:.1f} ч.")
+                    await asyncio.sleep(nap)
+
+                wait_time = random.uniform(MIN_ACTION_INTERVAL_SEC, MAX_ACTION_INTERVAL_SEC)
+                logging.info(f"Следующее действие через {wait_time:.0f} сек.")
+                await asyncio.sleep(wait_time)
+
+                # Подстрахуемся от разлогина
+                if "login" in page.url:
+                    logging.info("Похоже, сессия слетела — перезаход.")
+                    if not await ensure_logged_in(context, page, GODVILLE_LOGIN, GODVILLE_PASSWORD):
+                        logging.error("Перелогин не удался. Завершаю.")
+                        return
+
+                # Действие
+                done = await click_prana_action(page)
+                if not done:
+                    logging.info("Действие пропущено (нет доступных кнопок).")
+
+        except PlaywrightTimeoutError as te:
+            logging.error(f"Таймаут: {te}")
+            await save_debug(page, "timeout_debug")
+        except asyncio.CancelledError:
+            logging.info("Остановка по запросу.")
+        except Exception as e:
+            logging.error(f"Необработанная ошибка: {e}")
+            await save_debug(page, "crash_debug")
+        finally:
+            await context.close()
+            await browser.close()
+
+
+if __name__ == "__main__":
     try:
-        asyncio.run(main_manager())
+        asyncio.run(run_bot())
     except KeyboardInterrupt:
         logging.info("Программа остановлена пользователем.")
