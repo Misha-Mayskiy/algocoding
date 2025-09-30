@@ -3,175 +3,219 @@ import os
 import random
 import logging
 from pathlib import Path
+from typing import Optional, Tuple
 
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
-# ===================== Конфиг =====================
+# ===================== Конфигурация =====================
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def _env_flag(name: str, default: str = '0') -> bool:
+    return os.getenv(name, default).strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+
+
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s - %(levelname)s - %(message)s')
 
 GODVILLE_LOGIN = os.getenv('GODVILLE_LOGIN')
 GODVILLE_PASSWORD = os.getenv('GODVILLE_PASSWORD')
 
-HEADLESS_MODE = os.getenv('HEADLESS', '0').lower() in ('1', 'true', 'yes', 'y')
-LOG_PAGE_CONSOLE = os.getenv('LOG_PAGE_CONSOLE', '0').lower() in ('1', 'true', 'yes', 'y')  # логи из консоли страницы
-FILTER_CONSOLE_NOISE = True  # фильтр шумных сообщений (GTM/GA/CSP) если LOG_PAGE_CONSOLE включен
-BLOCK_TRACKERS = os.getenv('BLOCK_TRACKERS', '1').lower() in ('1', 'true', 'yes', 'y')  # блокируем трекеры
+# Экономия ресурсов по умолчанию
+HEADLESS = _env_flag('HEADLESS', '1')
+BLOCK_TRACKERS = _env_flag('BLOCK_TRACKERS', '1')
+BLOCK_MEDIA = _env_flag('BLOCK_MEDIA', '1')  # режем image/font/media
+SAVE_STATE = _env_flag('SAVE_STATE', '1')  # хранить state.json (куки и пр.)
 
-STATE_PATH = Path("state.json")
+STATE_PATH = Path(os.getenv('STATE_PATH', 'state.json'))
+
+USER_AGENT = os.getenv('USER_AGENT',
+                       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36')
+LOCALE = os.getenv('LOCALE', 'ru-RU')
+VIEWPORT_W = int(os.getenv('VIEWPORT_W', '960'))
+VIEWPORT_H = int(os.getenv('VIEWPORT_H', '600'))
 
 LOGIN_URL = 'https://godville.net/login'
 HERO_URL = 'https://godville.net/superhero'
 
-# Интервалы между действиями (сек)
-MIN_ACTION_INTERVAL_SEC = int(os.getenv('MIN_ACTION_INTERVAL_SEC', '120'))
-MAX_ACTION_INTERVAL_SEC = int(os.getenv('MAX_ACTION_INTERVAL_SEC', '300'))
+# Режим действий: random | good | bad
+ACTION_MODE_RAW = os.getenv('ACTION_MODE', 'random').strip().lower()
+ALIASES = {
+    'rand': 'random', 'rnd': 'random', 'случайно': 'random',
+    'good-only': 'good', 'enc': 'good', 'encour': 'good', 'хорошо': 'good',
+    'bad-only': 'bad', 'pun': 'bad', 'punish': 'bad', 'плохо': 'bad'
+}
+ACTION_MODE = ALIASES.get(ACTION_MODE_RAW, ACTION_MODE_RAW)
+if ACTION_MODE not in ('random', 'good', 'bad'):
+    ACTION_MODE = 'random'
+ACTION_FALLBACK = _env_flag('ACTION_FALLBACK', '0')
 
-# Иногда имитируем «сон»
-SLEEP_PROBABILITY = float(os.getenv('SLEEP_PROBABILITY', '0.1'))
-SLEEP_MIN_SEC = int(os.getenv('SLEEP_MIN_SEC', '3600'))  # 1 час
-SLEEP_MAX_SEC = int(os.getenv('SLEEP_MAX_SEC', '10800'))  # 3 часа
+# Интервалы между попытками действий
+MIN_ACTION_INTERVAL_SEC = int(os.getenv('MIN_ACTION_INTERVAL_SEC', '5'))
+MAX_ACTION_INTERVAL_SEC = int(os.getenv('MAX_ACTION_INTERVAL_SEC', '20'))
 
-USER_AGENT = os.getenv('USER_AGENT',
-                       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36')
-LOCALE = os.getenv('LOCALE', 'ru-RU')
+# Когда кнопок нет N раз подряд — «спим»
+NO_BUTTONS_GRACE_CHECKS = int(os.getenv('NO_BUTTONS_GRACE_CHECKS', '3'))
+SHORT_RETRY_DELAY_SEC = float(os.getenv('SHORT_RETRY_DELAY_SEC', '1.5'))
 
-TRACKER_BLOCK_LIST = [
-    '*://*.googletagmanager.com/*',
-    '*://*.google-analytics.com/*',
-    '*://*.doubleclick.net/*',
-    '*://*.g.doubleclick.net/*',
-    '*://www.google.com/ccm/*',
+SLEEP_MIN_SEC = int(os.getenv('SLEEP_MIN_SEC', '3600'))
+SLEEP_MAX_SEC = int(os.getenv('SLEEP_MAX_SEC', '7200'))
+
+# Если не видим кнопки несколько раз — делаем мягкое обновление/переход
+RELOAD_ON_MISS = int(os.getenv('RELOAD_ON_MISS', '2'))  # после скольких промахов делать page.reload
+NAVIGATE_ON_MISS = int(os.getenv('NAVIGATE_ON_MISS', '4'))  # после скольких промахов делать goto(HERO_URL)
+
+# Тайминги
+CLICK_TIMEOUT_MS = int(os.getenv('CLICK_TIMEOUT_MS', '1500'))
+DETECT_TIMEOUT_MS = int(os.getenv('DETECT_TIMEOUT_MS', '7000'))
+
+# Хосты-трекеры (отрежем для экономии трафика и шума)
+TRACKER_HOST_SUBSTR = (
+    'googletagmanager.com', 'google-analytics.com', 'doubleclick.net',
+    'g.doubleclick.net', 'www.google.com/ccm'
+)
+
+# Селекторы кнопок
+GOOD_SELECTORS = [
+    '#cntrl1 a.enc_link', '#cntrl a.enc_link', 'a.enc_link',
+    'a:has-text("Сделать хорошо")', 'button:has-text("Сделать хорошо")',
+    '[onclick*="encour"]', 'a[href*="encour"]',
+]
+BAD_SELECTORS = [
+    '#cntrl1 a.pun_link', '#cntrl a.pun_link', 'a.pun_link',
+    'a:has-text("Сделать плохо")', 'button:has-text("Сделать плохо")',
+    '[onclick*="punish"]', 'a[href*="punish"]',
 ]
 
 
+# ===================== Маршрутизация запросов (экономия трафика) =====================
+async def setup_routing(context):
+    if not (BLOCK_TRACKERS or BLOCK_MEDIA):
+        return
+
+    async def route_all(route):
+        try:
+            req = route.request
+            url = req.url
+            rtype = req.resource_type
+
+            if BLOCK_MEDIA and rtype in ('image', 'media', 'font'):
+                return await route.abort()
+
+            if BLOCK_TRACKERS and any(h in url for h in TRACKER_HOST_SUBSTR):
+                return await route.abort()
+
+            return await route.continue_()
+        except Exception:
+            try:
+                await route.continue_()
+            except Exception:
+                pass
+
+    await context.route("**/*", route_all)
+
+
 # ===================== Утилиты =====================
-async def click_if_visible(page, selector: str, timeout: int = 1500) -> bool:
-    try:
-        loc = page.locator(selector).first
-        if await loc.count() == 0:
-            return False
-        if await loc.is_visible():
-            await loc.click(timeout=timeout)
-            return True
-    except Exception:
-        return False
-    return False
-
-
 async def dismiss_cookie_banners(page):
-    candidates = [
-        'button:has-text("Принять")',
-        'button:has-text("Соглас")',
-        'button:has-text("OK")',
-        'button:has-text("ОК")',
-        'button:has-text("Accept")',
-        'button:has-text("I agree")',
-        'text=Принять',
-        'text=Соглас',
-        'text=Accept',
-        'text=I agree',
-    ]
-    for sel in candidates:
-        if await click_if_visible(page, sel):
-            logging.info(f"Закрыл баннер по селектору: {sel}")
-            await asyncio.sleep(0.2)
-
-
-async def save_debug(page, prefix="debug"):
-    png = f"{prefix}.png"
-    html = f"{prefix}.html"
-    try:
-        await page.screenshot(path=png, full_page=True)
-        with open(html, "w", encoding="utf-8") as f:
-            f.write(await page.content())
-        logging.info(f"Сохранил отладочные файлы: {png}, {html}")
-    except Exception as e:
-        logging.warning(f"Не удалось сохранить отладочные файлы: {e}")
-
-
-def attach_console_logger(page):
-    if not LOG_PAGE_CONSOLE:
-        return
-
-    noise_keywords = (
-        'googletagmanager', 'google-analytics', 'doubleclick',
-        'Content Security Policy', 'CSP', "Refused to connect", "Refused to frame",
-        "Failed to execute 'postMessage'"
+    candidates = (
+        'button:has-text("Принять")', 'button:has-text("Соглас")',
+        'button:has-text("OK")', 'button:has-text("ОК")',
+        'button:has-text("Accept")', 'button:has-text("I agree")',
+        'text=Принять', 'text=Соглас', 'text=Accept', 'text=I agree',
     )
-
-    def _on_console(msg):
+    for sel in candidates:
         try:
-            text = msg.text
-        except Exception:
-            text = ''
-        try:
-            loc = msg.location
-            src = loc.get('url', '')
-        except Exception:
-            src = ''
-        if FILTER_CONSOLE_NOISE:
-            if any(k in text or k in src for k in noise_keywords):
-                return
-        logging.info(f"[console] {msg.type}: {text}")
-
-    page.on("console", _on_console)
-
-
-async def setup_blocking_routes(context):
-    if not BLOCK_TRACKERS:
-        return
-
-    async def _block(route):
-        try:
-            await route.abort()
+            loc = page.locator(sel).first
+            if await loc.count() and await loc.is_visible():
+                await loc.click()
+                await asyncio.sleep(0.2)
         except Exception:
             pass
 
-    for pattern in TRACKER_BLOCK_LIST:
-        await context.route(pattern, _block)
+
+async def save_debug(page, prefix="debug"):
+    try:
+        await page.screenshot(path=f"{prefix}.png", full_page=True)
+        with open(f"{prefix}.html", "w", encoding="utf-8") as f:
+            f.write(await page.content())
+        logging.info(f"Сохранил {prefix}.png / {prefix}.html")
+    except Exception as e:
+        logging.debug(f"Не удалось сохранить отладку: {e}")
+
+
+async def _first_visible(page, selectors) -> Tuple[Optional[object], Optional[str]]:
+    """Первый видимый локатор из набора селекторов."""
+    for sel in selectors:
+        loc = page.locator(sel).first
+        try:
+            if await loc.count():
+                try:
+                    await loc.scroll_into_view_if_needed(timeout=300)
+                except Exception:
+                    pass
+                if await loc.is_visible():
+                    return loc, sel
+        except Exception:
+            continue
+    return None, None
+
+
+async def wait_prana_controls(page, which='any', timeout_ms=DETECT_TIMEOUT_MS) -> bool:
+    """Ждём появления кнопок 'Сделать хорошо/плохо'. which: any|good|bad"""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + (timeout_ms / 1000.0)
+    while loop.time() < deadline:
+        good_loc, _ = await _first_visible(page, GOOD_SELECTORS)
+        bad_loc, _ = await _first_visible(page, BAD_SELECTORS)
+        if which == 'good' and good_loc:
+            return True
+        if which == 'bad' and bad_loc:
+            return True
+        if which == 'any' and (good_loc or bad_loc):
+            return True
+        await asyncio.sleep(0.25)
+    return False
+
+
+async def find_action_buttons(page):
+    good_loc, good_sel = await _first_visible(page, GOOD_SELECTORS)
+    bad_loc, bad_sel = await _first_visible(page, BAD_SELECTORS)
+    return good_loc, bad_loc, {"good": good_sel, "bad": bad_sel}
 
 
 # ===================== Логин/сессия =====================
 async def perform_login(page, login: str, password: str) -> bool:
     logging.info("Открываю страницу логина...")
     await page.goto(LOGIN_URL, wait_until="domcontentloaded")
-    await dismiss_cookie_banners(page)
 
-    # Ждём появления формы
+    await dismiss_cookie_banners(page)
     await page.wait_for_selector('form[action="/login"], input[name], button[type="submit"]', timeout=20000)
 
-    # Поля/кнопка с запасом по селекторам
     user_sel = 'input[name="username"], input[name="login"], #username, form[action="/login"] input[type="text"]'
     pass_sel = 'input[name="password"], #password, form[action="/login"] input[type="password"]'
     submit_sel = 'button:has-text("Войти"), input[type="submit"], button[type="submit"]'
 
-    logging.info("Ввожу логин и пароль...")
     await page.locator(user_sel).first.fill(login)
     await page.locator(pass_sel).first.fill(password)
 
-    logging.info("Жму «Войти» и жду переход...")
     try:
         async with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
             await page.locator(submit_sel).first.click()
     except PlaywrightTimeoutError:
-        logging.warning("Навигации после сабмита не было — продолжаю проверку...")
+        logging.warning("Навигации после сабмита не было — проверяю вручную...")
 
-    # Переходим на страницу героя и валидируем
     await page.goto(HERO_URL, wait_until="domcontentloaded")
 
     if "login" in page.url:
-        logging.error("Похоже, логин не удался — всё ещё на /login.")
+        logging.error("Логин не удался — всё ещё на /login.")
         await save_debug(page, "login_failed")
         return False
 
-    # Ждём ключевые элементы страницы героя
     try:
-        await page.wait_for_selector('#cntrl1, #god_name, #cntrl', timeout=20000)
+        await page.wait_for_selector('#cntrl1, #cntrl, #god_name', timeout=20000)
     except PlaywrightTimeoutError:
-        logging.error("Не дождался элементов страницы героя после логина.")
+        logging.error("Не дождался признаков страницы героя.")
         await save_debug(page, "hero_wait_failed")
         return False
 
@@ -184,55 +228,56 @@ async def ensure_logged_in(context, page, login, password) -> bool:
     if "login" in page.url:
         logging.info("Сессии нет — логинюсь.")
         ok = await perform_login(page, login, password)
-        if ok:
+        if ok and SAVE_STATE:
             try:
                 await context.storage_state(path=str(STATE_PATH))
                 logging.info(f"Сессия сохранена в {STATE_PATH}")
             except Exception as e:
-                logging.warning(f"Не удалось сохранить сессию: {e}")
+                logging.debug(f"Не удалось сохранить сессию: {e}")
         return ok
-    logging.info("Сессия активна.")
     return True
 
 
-# ===================== Действия =====================
+# ===================== Клик по действию =====================
 async def click_prana_action(page) -> bool:
-    # Если не на странице героя — зайдём
+    """Кликает good/bad по режиму. Возвращает True, если кликнули."""
     if "superhero" not in page.url:
         await page.goto(HERO_URL, wait_until="domcontentloaded")
 
-    # Лёгкое обновление, чтобы подтянуть актуальное состояние
-    try:
-        await page.reload(wait_until="domcontentloaded")
-    except Exception:
-        pass
+    which = 'any' if ACTION_MODE == 'random' else ACTION_MODE
+    if not await wait_prana_controls(page, which=which, timeout_ms=DETECT_TIMEOUT_MS):
+        return False
 
-    actions = [
-        ('#cntrl1 a.enc_link', 'Сделать хорошо'),
-        ('#cntrl1 a.pun_link', 'Сделать плохо'),
-        ('#cntrl a.enc_link', 'Сделать хорошо'),
-        ('#cntrl a.pun_link', 'Сделать плохо'),
-    ]
+    good_loc, bad_loc, _ = await find_action_buttons(page)
 
-    is_good = random.choice([True, False])
-    ordered = [a for a in actions if ('enc_link' in a[0]) == is_good] + [a for a in actions if
-                                                                         ('enc_link' in a[0]) != is_good]
+    candidates = []
+    if ACTION_MODE == 'random':
+        if random.choice([True, False]):
+            if good_loc: candidates.append(("Сделать хорошо", good_loc))
+            if bad_loc:  candidates.append(("Сделать плохо", bad_loc))
+        else:
+            if bad_loc:  candidates.append(("Сделать плохо", bad_loc))
+            if good_loc: candidates.append(("Сделать хорошо", good_loc))
+    elif ACTION_MODE == 'good':
+        if good_loc:
+            candidates.append(("Сделать хорошо", good_loc))
+        elif ACTION_FALLBACK and bad_loc:
+            candidates.append(("Сделать плохо", bad_loc))
+    else:  # ACTION_MODE == 'bad'
+        if bad_loc:
+            candidates.append(("Сделать плохо", bad_loc))
+        elif ACTION_FALLBACK and good_loc:
+            candidates.append(("Сделать хорошо", good_loc))
 
-    for selector, title in ordered:
-        loc = page.locator(selector).first
-        if await loc.count() == 0:
-            continue
+    for title, loc in candidates:
         try:
-            if await loc.is_visible():
-                logging.info(f"Нажимаю «{title}» ({selector})")
-                await loc.click()
-                await asyncio.sleep(random.uniform(1.0, 2.0))
-                return True
-        except Exception as e:
-            logging.debug(f"Не удалось нажать {title}: {e}")
+            await loc.click(timeout=CLICK_TIMEOUT_MS)
+            await asyncio.sleep(random.uniform(0.6, 1.2))  # мягкая пауза после клика
+            logging.info(f"Нажал: {title}")
+            return True
+        except Exception:
             continue
 
-    logging.info("Кнопок траты праны нет или они недоступны.")
     return False
 
 
@@ -242,59 +287,89 @@ async def run_bot():
         logging.error("Не найдены GODVILLE_LOGIN / GODVILLE_PASSWORD в .env")
         return
 
+    launch_args = [
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-gpu",
+        "--mute-audio",
+        "--js-flags=--max-old-space-size=128",
+    ]
+
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=HEADLESS_MODE)
+        browser = await p.chromium.launch(headless=HEADLESS, args=launch_args)
         context_kwargs = dict(
             user_agent=USER_AGENT,
             locale=LOCALE,
+            viewport={"width": VIEWPORT_W, "height": VIEWPORT_H},
             extra_http_headers={"Accept-Language": f"{LOCALE},ru;q=0.9,en;q=0.8"},
         )
-        if STATE_PATH.exists():
+        if SAVE_STATE and STATE_PATH.exists():
             context_kwargs["storage_state"] = str(STATE_PATH)
 
         context = await browser.new_context(**context_kwargs)
-        await setup_blocking_routes(context)
+        await setup_routing(context)
 
+        # На всякий случай гасим любые диалоги/алерты
         page = await context.new_page()
         page.set_default_timeout(20000)
-        attach_console_logger(page)
+        page.on("dialog", lambda d: asyncio.create_task(d.dismiss()))
 
         try:
-            # Авторизация/сессия
-            ok = await ensure_logged_in(context, page, GODVILLE_LOGIN, GODVILLE_PASSWORD)
-            if not ok:
+            if not await ensure_logged_in(context, page, GODVILLE_LOGIN, GODVILLE_PASSWORD):
                 logging.error("Не удалось авторизоваться. Останавливаюсь.")
                 return
 
-            # Цикл действий
+            logging.info(
+                f"Режим действий: {ACTION_MODE}{' + fallback' if ACTION_FALLBACK else ''}. Headless={HEADLESS}.")
+            miss_streak = 0
+
             while True:
-                # Иногда «спим», имитируя оффлайн
-                if random.random() < SLEEP_PROBABILITY:
-                    nap = random.uniform(SLEEP_MIN_SEC, SLEEP_MAX_SEC)
-                    logging.info(f"Имитация сна на {nap / 3600:.1f} ч.")
-                    await asyncio.sleep(nap)
+                # Пауза между действиями (минимальная для экономии CPU)
+                await asyncio.sleep(random.uniform(MIN_ACTION_INTERVAL_SEC, MAX_ACTION_INTERVAL_SEC))
 
-                wait_time = random.uniform(MIN_ACTION_INTERVAL_SEC, MAX_ACTION_INTERVAL_SEC)
-                logging.info(f"Следующее действие через {wait_time:.0f} сек.")
-                await asyncio.sleep(wait_time)
-
-                # Подстрахуемся от разлогина
+                # Если разлогинило — перелогин
                 if "login" in page.url:
-                    logging.info("Похоже, сессия слетела — перезаход.")
                     if not await ensure_logged_in(context, page, GODVILLE_LOGIN, GODVILLE_PASSWORD):
                         logging.error("Перелогин не удался. Завершаю.")
                         return
 
-                # Действие
-                done = await click_prana_action(page)
-                if not done:
-                    logging.info("Действие пропущено (нет доступных кнопок).")
+                # Периодически подстраховываемся лёгким обновлением, но не каждую итерацию
+                if miss_streak == RELOAD_ON_MISS:
+                    try:
+                        await page.reload(wait_until="domcontentloaded")
+                    except Exception:
+                        pass
+                elif miss_streak >= NAVIGATE_ON_MISS:
+                    try:
+                        await page.goto(HERO_URL, wait_until="domcontentloaded")
+                    except Exception:
+                        pass
+
+                clicked = await click_prana_action(page)
+                if clicked:
+                    miss_streak = 0
+                    continue
+
+                # Кнопок нет — короткий ретрай
+                miss_streak += 1
+                logging.info(f"Кнопок нет (#{miss_streak}). Повторная проверка через {SHORT_RETRY_DELAY_SEC:.1f} сек.")
+                await asyncio.sleep(SHORT_RETRY_DELAY_SEC)
+
+                clicked_retry = await click_prana_action(page)
+                if clicked_retry:
+                    miss_streak = 0
+                    continue
+
+                if miss_streak >= NO_BUTTONS_GRACE_CHECKS:
+                    # Кажется, прану потратили — уходим в сон
+                    nap = random.uniform(SLEEP_MIN_SEC, SLEEP_MAX_SEC)
+                    logging.info(f"Кнопок нет {miss_streak} раз подряд — сон на {nap / 60:.0f} мин.")
+                    miss_streak = 0
+                    await asyncio.sleep(nap)
 
         except PlaywrightTimeoutError as te:
             logging.error(f"Таймаут: {te}")
             await save_debug(page, "timeout_debug")
-        except asyncio.CancelledError:
-            logging.info("Остановка по запросу.")
         except Exception as e:
             logging.error(f"Необработанная ошибка: {e}")
             await save_debug(page, "crash_debug")
@@ -307,4 +382,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(run_bot())
     except KeyboardInterrupt:
-        logging.info("Программа остановлена пользователем.")
+        logging.info("Остановлено пользователем.")
